@@ -9,6 +9,7 @@ import {
   TextInput,
   Dimensions,
   Pressable,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -335,24 +336,25 @@ export default function Accommodation() {
 
                 <View style={styles.bigSectorCard}>
 
-                  <LinearGradient
-
-                    colors={['rgba(255, 107, 0, 0.1)', 'rgba(0,0,0,0.8)']}
-
-                    style={StyleSheet.absoluteFill}
-
+                  <Image 
+                    source={item.id === 'Boys' ? require('../../assets/boys.png') : require('../../assets/girls.png')} 
+                    style={[styles.sectorImage, { opacity: 0.9 }]}
+                    resizeMode="cover"
                   />
 
-                  <Text style={styles.sectorTitle}>{item.title}</Text>
+                  <LinearGradient
+                    colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.8)']}
+                    style={StyleSheet.absoluteFill}
+                  />
 
-                  <Text style={styles.sectorSub}>{item.sub}</Text>
+                  <View style={styles.sectorContent}>
+                    <Text style={styles.sectorTitle}>{item.title}</Text>
+                    <Text style={styles.sectorSub}>{item.sub}</Text>
 
-                  <View style={styles.indicatorContainer}>
-
-                    <View style={[styles.dot, selectedGender === 'Boys' ? styles.dotActive : styles.dotInactive]} />
-
-                    <View style={[styles.dot, selectedGender === 'Girls' ? styles.dotActive : styles.dotInactive]} />
-
+                    <View style={styles.indicatorContainer}>
+                      <View style={[styles.dot, selectedGender === 'Boys' ? styles.dotActive : styles.dotInactive]} />
+                      <View style={[styles.dot, selectedGender === 'Girls' ? styles.dotActive : styles.dotInactive]} />
+                    </View>
                   </View>
 
                 </View>
@@ -521,12 +523,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   bigSectorCard: {
-    height: 180,
+    height: 220,
     backgroundColor: '#000000',
     borderRadius: 24,
     borderWidth: 1,
     borderColor: THEME.border,
     overflow: 'hidden',
+  },
+  sectorImage: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+  },
+  sectorContent: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
