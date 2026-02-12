@@ -77,7 +77,7 @@ const CarouselCard = memo(({ item, index, scrollX, onPress }: any) => {
     const translateY = interpolate(
       scrollX.value,
       input,
-      [30, -10, 30],
+      [40, 0, 40],
       Extrapolation.CLAMP
     );
 
