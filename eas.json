@@ -1,0 +1,38 @@
+{
+  "cli": {
+    "version": ">= 16.28.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://verge-backend-server.onrender.com",
+        "EXPO_PUBLIC_PROJECT_ID": "2abb813f-c27a-49e0-a5d7-939cef3be21a"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://verge-backend-server.onrender.com",
+        "EXPO_PUBLIC_PROJECT_ID": "2abb813f-c27a-49e0-a5d7-939cef3be21a"
+      }
+    },
+    "apk": {
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://verge-backend-server.onrender.com",
+        "EXPO_PUBLIC_PROJECT_ID": "2abb813f-c27a-49e0-a5d7-939cef3be21a"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
