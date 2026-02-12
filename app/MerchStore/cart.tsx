@@ -35,6 +35,18 @@ export default function Cart() {
     }
   };
 
+  const updateQty = (id: string, delta: number) => {
+    setCart((prev: any[]) =>
+      prev.flatMap((item) => {
+        if (item._id !== id) return [item];
+        const currentQty = Number.isFinite(item.quantity) ? item.quantity : 1;
+        const nextQty = currentQty + delta;
+        if (nextQty <= 0) return [];
+        return [{ ...item, quantity: nextQty }];
+      })
+    );
+  };
+
   const internalClear = () => {
     if (clearCart) {
       clearCart();
@@ -60,18 +72,26 @@ export default function Cart() {
         <Text style={styles.itemTitle} numberOfLines={1}>
           {item.title}
         </Text>
-        <Text style={styles.itemQty}>
-          QTY: {item.quantity}
-        </Text>
         <Text style={styles.itemPrice}>₹{item.price * item.quantity}</Text>
       </View>
 
-      <TouchableOpacity
-        onPress={() => internalRemove(item._id)}
-        style={styles.deleteButton}
-      >
-        <Ionicons name="trash-outline" size={18} color={THEME.textMuted} />
-      </TouchableOpacity>
+      <View style={styles.qtyBar}>
+        <Pressable
+          onPress={() => updateQty(item._id, -1)}
+          style={styles.qtyButton}
+          hitSlop={8}
+        >
+          <Ionicons name="remove" size={16} color={THEME.text} />
+        </Pressable>
+        <Text style={styles.qtyValue}>{item.quantity}</Text>
+        <Pressable
+          onPress={() => updateQty(item._id, 1)}
+          style={styles.qtyButton}
+          hitSlop={8}
+        >
+          <Ionicons name="add" size={16} color={THEME.text} />
+        </Pressable>
+      </View>
     </View>
   );
 
@@ -236,24 +256,38 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 4,
   },
-  itemQty: {
-    color: THEME.textMuted,
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
   itemPrice: {
     color: THEME.accent,
     fontSize: 16,
     fontWeight: '900',
   },
-  deleteButton: {
-    padding: 10,
-    borderRadius: 8,
+  qtyBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: THEME.surface,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: THEME.borderLight,
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    gap: 6,
+  },
+  qtyButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#101010',
+    borderWidth: 1,
+    borderColor: THEME.borderLight,
+  },
+  qtyValue: {
+    minWidth: 18,
+    textAlign: 'center',
+    color: THEME.text,
+    fontSize: 12,
+    fontWeight: '800',
   },
   summaryContainer: {
     backgroundColor: THEME.cardBg,

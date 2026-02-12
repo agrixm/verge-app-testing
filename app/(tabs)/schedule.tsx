@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   StyleSheet,
   Text,
@@ -6,6 +6,8 @@ import {
   Pressable,
   FlatList,
   TouchableOpacity,
+  Image,
+  ImageBackground,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,14 +15,14 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
+  withTiming,
   runOnJS,
   FadeInUp,
-  FadeInDown,
-  StretchInX,
   Layout,
 } from 'react-native-reanimated';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Defs, LinearGradient as SvgGradient, Stop, Path } from 'react-native-svg';
 import { useRouter } from 'expo-router';
 
 // --- THEME ---
@@ -69,15 +71,21 @@ const MISSION_PHASES = [
   "PROTOCOL: TERMINATION"
 ];
 
+const EVENTS_BY_DAY = SCHEDULE_DATA.reduce<Record<number, Event[]>>((acc, event) => {
+  if (!acc[event.day]) acc[event.day] = [];
+  acc[event.day].push(event);
+  return acc;
+}, {});
+
+Object.values(EVENTS_BY_DAY).forEach((events) => {
+  events.sort((a, b) => a.time.localeCompare(b.time));
+});
+
 export default function ScheduleScreen() {
   const router = useRouter();
   const [selectedDay, setSelectedDay] = useState(1);
 
-  const filteredEvents = useMemo(() => {
-    return SCHEDULE_DATA
-      .filter(e => e.day === selectedDay)
-      .sort((a, b) => a.time.localeCompare(b.time));
-  }, [selectedDay]);
+  const filteredEvents = useMemo(() => EVENTS_BY_DAY[selectedDay] || [], [selectedDay]);
 
   const currentVessel = useMemo(() => 
     MISSION_PHASES[selectedDay - 1] || "No Mission Active", 
@@ -87,25 +95,57 @@ export default function ScheduleScreen() {
   // --- JOYSTICK LOGIC ---
   const translateX = useSharedValue(0);
   const hasChanged = useSharedValue(false);
+  const glowSide = useSharedValue<0 | -1 | 1>(0);
+  const leftGlowOpacity = useSharedValue(0);
+  const rightGlowOpacity = useSharedValue(0);
   const MAX_SLIDE = 40;
   const TRIGGER_THRESHOLD = 20;
+  const GLOW_TRIGGER = 8;
 
-  const changeDay = (direction: 'next' | 'prev') => {
+  const changeDay = useCallback((direction: 'next' | 'prev') => {
     setSelectedDay((prev) => {
       if (direction === 'next') return prev === 3 ? 1 : prev + 1;
       return prev === 1 ? 3 : prev - 1;
     });
-  };
+  }, []);
 
   const panGesture = Gesture.Pan()
     .onUpdate((e) => {
-      translateX.value = Math.max(-MAX_SLIDE, Math.min(MAX_SLIDE, e.translationX));
-      
+      const clampedX = Math.max(-MAX_SLIDE, Math.min(MAX_SLIDE, e.translationX));
+      translateX.value = clampedX;
+
+      // Keep directional preview glow while dragging before a switch is triggered.
       if (!hasChanged.value) {
+        let nextGlowSide: 0 | -1 | 1 = 0;
+        if (clampedX <= -GLOW_TRIGGER) nextGlowSide = -1;
+        if (clampedX >= GLOW_TRIGGER) nextGlowSide = 1;
+
+        // Avoid spawning timing animations on every frame.
+        if (nextGlowSide !== glowSide.value) {
+          glowSide.value = nextGlowSide;
+          if (nextGlowSide === -1) {
+            leftGlowOpacity.value = withTiming(1, { duration: 110 });
+            rightGlowOpacity.value = withTiming(0, { duration: 110 });
+          } else if (nextGlowSide === 1) {
+            rightGlowOpacity.value = withTiming(1, { duration: 110 });
+            leftGlowOpacity.value = withTiming(0, { duration: 110 });
+          } else {
+            leftGlowOpacity.value = withTiming(0, { duration: 140 });
+            rightGlowOpacity.value = withTiming(0, { duration: 140 });
+          }
+        }
+
+        // Once day actually switches, force the glow to full on that side.
         if (e.translationX > TRIGGER_THRESHOLD) {
+          rightGlowOpacity.value = 1;
+          leftGlowOpacity.value = 0;
+          glowSide.value = 1;
           runOnJS(changeDay)('next');
           hasChanged.value = true;
         } else if (e.translationX < -TRIGGER_THRESHOLD) {
+          leftGlowOpacity.value = 1;
+          rightGlowOpacity.value = 0;
+          glowSide.value = -1;
           runOnJS(changeDay)('prev');
           hasChanged.value = true;
         }
@@ -113,14 +153,25 @@ export default function ScheduleScreen() {
     })
     .onFinalize(() => {
       translateX.value = withSpring(0, { damping: 15 });
+      leftGlowOpacity.value = withTiming(0, { duration: 1000 });
+      rightGlowOpacity.value = withTiming(0, { duration: 1000 });
+      glowSide.value = 0;
       hasChanged.value = false;
     });
 
-  const animatedKnobStyle = useAnimatedStyle(() => ({
+  const animatedMoonStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],
   }));
 
-  const renderTimelineItem = ({ item, index }: { item: Event; index: number }) => {
+  const animatedLeftGlowStyle = useAnimatedStyle(() => ({
+    opacity: leftGlowOpacity.value,
+  }));
+
+  const animatedRightGlowStyle = useAnimatedStyle(() => ({
+    opacity: rightGlowOpacity.value,
+  }));
+
+  const renderTimelineItem = useCallback(({ item, index }: { item: Event; index: number }) => {
     return (
       <Animated.View 
         entering={FadeInUp.delay(index * 100).springify()} 
@@ -145,7 +196,7 @@ export default function ScheduleScreen() {
         </View>
       </Animated.View>
     );
-  };
+  }, []);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -193,7 +244,13 @@ export default function ScheduleScreen() {
           </Text>
         </View>
 
-        <View style={styles.mainCard}>
+        <ImageBackground
+          source={require('../../assets/schedule-bg.png')}
+          style={styles.mainCard}
+          resizeMode="cover"
+          imageStyle={{ transform: [{ scale: 1.15 }] }}
+        >
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)' }]} />
           {/* Vertical Line with Gradient & Glow */}
           <View style={styles.timelineLineContainer}>
             <LinearGradient
@@ -218,13 +275,153 @@ export default function ScheduleScreen() {
               </View>
             }
           />
-        </View>
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.4)', 'rgba(0,0,0,0.7)']}
+            style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 40 }}
+            pointerEvents="none"
+          />
+        </ImageBackground>
 
         <View style={styles.navControl}>
           <View style={styles.joystickBase}>
+            <View pointerEvents="none" style={[styles.joystickHint, styles.joystickHintLeft]}>
+              <Image
+                source={require('../../assets/chevron-l.png')}
+                style={{ width: '100%', height: '100%' }}
+                resizeMode="contain"
+              />
+            </View>
+            <View pointerEvents="none" style={[styles.joystickHint, styles.joystickHintRight]}>
+              <Image
+                source={require('../../assets/chevron-r.png')}
+                style={{ width: '100%', height: '100%' }}
+                resizeMode="contain"
+              />
+            </View>
             <GestureDetector gesture={panGesture}>
-              <Animated.View style={[styles.joystickKnob, animatedKnobStyle]}>
-                <Text style={styles.joystickIcon}>{'<>'}</Text>
+              <Animated.View style={[styles.moonJoystick, animatedMoonStyle]}>
+                <View style={styles.moonInner}>
+                  <Image
+                    source={require('../../assets/moon.png')}
+                    style={styles.moonImage}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.moonVignette} />
+                </View>
+                <Animated.View pointerEvents="none" style={[styles.moonArcOverlay, animatedLeftGlowStyle]}>
+                  <Svg width="100%" height="100%" viewBox="0 0 100 100">
+                    <Defs>
+                      <SvgGradient id="moonLeftArcGlow" x1="50%" y1="0%" x2="50%" y2="100%">
+                        <Stop offset="0%" stopColor="#FF9B2A" stopOpacity="0" />
+                        <Stop offset="32%" stopColor="#FF9B2A" stopOpacity="0.38" />
+                        <Stop offset="50%" stopColor="#FF9B2A" stopOpacity="0.95" />
+                        <Stop offset="68%" stopColor="#FF9B2A" stopOpacity="0.38" />
+                        <Stop offset="100%" stopColor="#FF9B2A" stopOpacity="0" />
+                      </SvgGradient>
+                      <SvgGradient id="moonLeftArcCore" x1="50%" y1="0%" x2="50%" y2="100%">
+                        <Stop offset="0%" stopColor="#FF9B2A" stopOpacity="0" />
+                        <Stop offset="50%" stopColor="#FF9B2A" stopOpacity="1" />
+                        <Stop offset="100%" stopColor="#FF9B2A" stopOpacity="0" />
+                      </SvgGradient>
+                    </Defs>
+                    <Path
+                      d="M 23.6 12.3 A 46 46 0 0 0 23.6 87.7"
+                      stroke="url(#moonLeftArcGlow)"
+                      strokeWidth={14}
+                      strokeOpacity={0.08}
+                      strokeLinecap="round"
+                      fill="none"
+                    />
+                    <Path
+                      d="M 23.6 12.3 A 46 46 0 0 0 23.6 87.7"
+                      stroke="url(#moonLeftArcGlow)"
+                      strokeWidth={11}
+                      strokeOpacity={0.12}
+                      strokeLinecap="round"
+                      fill="none"
+                    />
+                    <Path
+                      d="M 23.6 12.3 A 46 46 0 0 0 23.6 87.7"
+                      stroke="url(#moonLeftArcGlow)"
+                      strokeWidth={8}
+                      strokeOpacity={0.18}
+                      strokeLinecap="round"
+                      fill="none"
+                    />
+                    <Path
+                      d="M 23.6 12.3 A 46 46 0 0 0 23.6 87.7"
+                      stroke="url(#moonLeftArcGlow)"
+                      strokeWidth={5}
+                      strokeOpacity={0.26}
+                      strokeLinecap="round"
+                      fill="none"
+                    />
+                    <Path
+                      d="M 23.6 12.3 A 46 46 0 0 0 23.6 87.7"
+                      stroke="url(#moonLeftArcCore)"
+                      strokeWidth={2.1}
+                      strokeLinecap="round"
+                      fill="none"
+                    />
+                  </Svg>
+                </Animated.View>
+                <Animated.View pointerEvents="none" style={[styles.moonArcOverlay, animatedRightGlowStyle]}>
+                  <Svg width="100%" height="100%" viewBox="0 0 100 100">
+                    <Defs>
+                      <SvgGradient id="moonRightArcGlow" x1="50%" y1="0%" x2="50%" y2="100%">
+                        <Stop offset="0%" stopColor="#FF9B2A" stopOpacity="0" />
+                        <Stop offset="32%" stopColor="#FF9B2A" stopOpacity="0.38" />
+                        <Stop offset="50%" stopColor="#FF9B2A" stopOpacity="0.95" />
+                        <Stop offset="68%" stopColor="#FF9B2A" stopOpacity="0.38" />
+                        <Stop offset="100%" stopColor="#FF9B2A" stopOpacity="0" />
+                      </SvgGradient>
+                      <SvgGradient id="moonRightArcCore" x1="50%" y1="0%" x2="50%" y2="100%">
+                        <Stop offset="0%" stopColor="#FF9B2A" stopOpacity="0" />
+                        <Stop offset="50%" stopColor="#FF9B2A" stopOpacity="1" />
+                        <Stop offset="100%" stopColor="#FF9B2A" stopOpacity="0" />
+                      </SvgGradient>
+                    </Defs>
+                    <Path
+                      d="M 76.4 12.3 A 46 46 0 0 1 76.4 87.7"
+                      stroke="url(#moonRightArcGlow)"
+                      strokeWidth={14}
+                      strokeOpacity={0.08}
+                      strokeLinecap="round"
+                      fill="none"
+                    />
+                    <Path
+                      d="M 76.4 12.3 A 46 46 0 0 1 76.4 87.7"
+                      stroke="url(#moonRightArcGlow)"
+                      strokeWidth={11}
+                      strokeOpacity={0.12}
+                      strokeLinecap="round"
+                      fill="none"
+                    />
+                    <Path
+                      d="M 76.4 12.3 A 46 46 0 0 1 76.4 87.7"
+                      stroke="url(#moonRightArcGlow)"
+                      strokeWidth={8}
+                      strokeOpacity={0.18}
+                      strokeLinecap="round"
+                      fill="none"
+                    />
+                    <Path
+                      d="M 76.4 12.3 A 46 46 0 0 1 76.4 87.7"
+                      stroke="url(#moonRightArcGlow)"
+                      strokeWidth={5}
+                      strokeOpacity={0.26}
+                      strokeLinecap="round"
+                      fill="none"
+                    />
+                    <Path
+                      d="M 76.4 12.3 A 46 46 0 0 1 76.4 87.7"
+                      stroke="url(#moonRightArcCore)"
+                      strokeWidth={2.1}
+                      strokeLinecap="round"
+                      fill="none"
+                    />
+                  </Svg>
+                </Animated.View>
               </Animated.View>
             </GestureDetector>
           </View>
@@ -298,7 +495,6 @@ const styles = StyleSheet.create({
     borderRadius: 24, 
     borderWidth: 1,
     borderColor: THEME.border,
-    backgroundColor: THEME.cardBg,
     overflow: 'hidden'
   },
   timelineLineContainer: {
@@ -342,18 +538,61 @@ const styles = StyleSheet.create({
   eventTitle: { fontSize: 16, color: THEME.text, fontWeight: '400', lineHeight: 22 },
   eventLocation: { fontSize: 11, color: THEME.textMuted, marginLeft: 4 },
 
-  navControl: { height: 100, justifyContent: 'center', alignItems: 'center' },
+  navControl: { height: 140, justifyContent: 'center', alignItems: 'center' },
   joystickBase: {
-    width: 70, height: 70, borderRadius: 35,
-    borderWidth: 1, borderColor: THEME.border,
-    backgroundColor: THEME.cardBg,
-    justifyContent: 'center', alignItems: 'center'
+    width: 160,
+    height: 130,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
   },
-  joystickKnob: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: THEME.text,
-    shadowColor: '#fff', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.2, shadowRadius: 10,
-    justifyContent: 'center', alignItems: 'center'
+  joystickHint: {
+    position: 'absolute',
+    width: 18,
+    height: 18,
+    opacity: 0.55,
   },
-  joystickIcon: { color: '#000', fontWeight: 'bold', fontSize: 16, marginTop: -2 }
+  joystickHintLeft: {
+    left: 10,
+    top: 56,
+  },
+  joystickHintRight: {
+    right: 10,
+    top: 56,
+  },
+  moonJoystick: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    overflow: 'visible',
+    backgroundColor: 'transparent',
+    shadowColor: '#ff3d2f',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+  },
+  moonInner: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 45,
+    overflow: 'hidden',
+    backgroundColor: '#120c0a',
+  },
+  moonArcOverlay: {
+    position: 'absolute',
+    top: -6,
+    left: -6,
+    width: 102,
+    height: 102,
+    zIndex: 3,
+  },
+  moonImage: {
+    width: '120%',
+    height: '120%',
+    position: 'absolute',
+    top: '-10%',
+    left: '-10%',},
+  moonVignette: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.18)',
+  },
 });

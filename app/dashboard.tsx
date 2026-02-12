@@ -637,7 +637,3 @@ export default function DashboardScreen() {
     </View>
   );
 }
-
-// const styles = StyleSheet.create({
-//   container: { flex: 1, backgroundColor: THEME.bg },
-// });
