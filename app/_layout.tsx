@@ -18,6 +18,7 @@ export default function RootLayout() {
     Orbitron_700Bold,
     Orbitron_900Black,
     'Anurati': require('../assets/fonts/Anurati-Regular.otf'),
+    'Guardians': require('../assets/fonts/Guardians.ttf'),
   });
 
   const [isBooting, setIsBooting] = useState(true);

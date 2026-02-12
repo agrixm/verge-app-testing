@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Dimensions,
   PanResponder,
+  FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -67,7 +68,7 @@ const CarouselCard = memo(({ item, index, scrollX, onPress }: any) => {
     const rotation = interpolate(
       scrollX.value,
       input,
-      [12, 0, -12], // Adjust these numbers for more/less "fan"
+      [8, 0, -8], // Reduced from 10 for flatter, more visible cards
       Extrapolation.CLAMP
     );
 
@@ -76,16 +77,15 @@ const CarouselCard = memo(({ item, index, scrollX, onPress }: any) => {
     const translateY = interpolate(
       scrollX.value,
       input,
-      [40, 0, 40], 
+      [30, -10, 30],
       Extrapolation.CLAMP
     );
 
     // 3. Horizontal Squeeze
-    // Rotated cards take up less horizontal space; we pull them in
     const translateX = interpolate(
       scrollX.value,
       input,
-      [30, 0, -30],
+      [-10, 0, 10], 
       Extrapolation.CLAMP
     );
 
@@ -132,8 +132,8 @@ const CarouselCard = memo(({ item, index, scrollX, onPress }: any) => {
 });
 
 // ── Fixed Point-to-Select Joystick ──────────────────────────────
-const ARC_RADIUS = 110;
-const ITEM_SIZE = 54;
+const ARC_RADIUS = 160;
+const ITEM_SIZE = 50;
 
 const JoystickButton = ({ activeCategory, onSelect }: any) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -142,7 +142,7 @@ const JoystickButton = ({ activeCategory, onSelect }: any) => {
 
   const menuPositions = useMemo(() => {
     return CATEGORIES.map((cat, i) => {
-      const angle = (140 / (CATEGORIES.length - 1)) * i + 20;
+      const angle = (100 / (CATEGORIES.length - 1)) * i + 40;
       const rad = (180 - angle) * (Math.PI / 180);
       return { cat, x: Math.cos(rad) * ARC_RADIUS, y: -Math.sin(rad) * ARC_RADIUS };
     });
@@ -210,7 +210,11 @@ const JoystickButton = ({ activeCategory, onSelect }: any) => {
 
       <View {...panResponder.panHandlers} style={[styles.mainOrb, isOpen && styles.orbActive]}>
         <LinearGradient colors={['#1A1A1A', '#000']} style={styles.orbGradient}>
-          <Ionicons name="filter" size={24} color={isOpen ? THEME.accent : THEME.textMuted} />
+          <Image 
+            source={require('../../assets/moon.png')} 
+            style={{ width: '100%', height: '100%', opacity: isOpen ? 1 : 0.6 }}
+            resizeMode="cover"
+          />
         </LinearGradient>
       </View>
     </View>
@@ -226,10 +230,20 @@ export default function Merch() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<string>('all');
   
+  const flatListRef = useRef<Animated.FlatList<any>>(null);
   const scrollX = useSharedValue(0);
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (e) => { scrollX.value = e.contentOffset.x; },
   });
+
+  useEffect(() => {
+    // Reset scroll when filters change to avoid "empty" view due to scroll offset
+    // Using requestAnimationFrame ensures the list has updated before we snap it to 0
+    requestAnimationFrame(() => {
+      flatListRef.current?.scrollToOffset({ offset: 0, animated: false });
+      scrollX.value = 0;
+    });
+  }, [activeTab, searchQuery]);
 
   useEffect(() => {
     (async () => {
@@ -247,7 +261,7 @@ export default function Merch() {
   ), [products, activeTab, searchQuery]);
 
   return (
-    <SafeAreaView edges={['top']} style={styles.container}>
+    <View style={styles.container}>
       <Image 
         source={require('../../assets/image.png')} 
         style={StyleSheet.absoluteFill} 
@@ -255,7 +269,8 @@ export default function Merch() {
       />
       <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.6)' }]} />
       
-      <View style={styles.header}>
+      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+        <View style={styles.header}>
         <View style={styles.headerRow}>
           <Pressable onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="chevron-back" size={24} color={THEME.text} />
@@ -287,14 +302,38 @@ export default function Merch() {
         />
       </View>
 
+      <View style={styles.categoryTabs}>
+        <FlatList
+          horizontal
+          data={CATEGORIES}
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 20 }}
+          renderItem={({ item }) => (
+            <Pressable 
+              onPress={() => setActiveTab(item)}
+              style={[styles.pill, activeTab === item && styles.pillActive]}
+            >
+              <Ionicons 
+                name={CATEGORY_ICONS[item]} 
+                size={14} 
+                color={activeTab === item ? '#000' : THEME.textMuted} 
+              />
+              <Text style={[styles.pillText, activeTab === item && styles.pillTextActive]}>
+                {item.toUpperCase()}
+              </Text>
+            </Pressable>
+          )}
+        />
+      </View>
+
       {loading ? (
         <View style={styles.center}><ActivityIndicator color={THEME.accent} /></View>
       ) : (
         <View style={styles.carouselWrapper}>
           <Animated.FlatList
+            ref={flatListRef}
             data={filtered}
             horizontal
-            itemLayoutAnimation={Layout.springify().damping(20)}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: SIDE_PADDING }}
             snapToInterval={CARD_TOTAL}
@@ -316,7 +355,8 @@ export default function Merch() {
           <JoystickButton activeCategory={activeTab} onSelect={setActiveTab} />
         </View>
       )}
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -328,7 +368,7 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingBottom: 15 },
   headerRow: { flexDirection: 'row', alignItems: 'center' },
   backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 24, fontWeight: '900', color: THEME.text, letterSpacing: 0.5 },
+  headerTitle: { fontSize: 24, fontFamily: 'Guardians', color: THEME.text, letterSpacing: 0.5 },
   headerSub: { fontSize: 11, color: THEME.textMuted, letterSpacing: 1, textTransform: 'uppercase' },
   headerActions: { flexDirection: 'row', gap: 10 },
   iconBtn: { width: 44, height: 44, borderRadius: 14, borderWidth: 1, borderColor: THEME.border, alignItems: 'center', justifyContent: 'center', backgroundColor: '#121212' },
@@ -340,8 +380,15 @@ const styles = StyleSheet.create({
   searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#111', marginHorizontal: 20, borderRadius: 15, paddingHorizontal: 16, height: 54, marginBottom: 10, borderWidth: 1, borderColor: THEME.border },
   searchInput: { flex: 1, marginLeft: 12, color: '#FFF', fontWeight: '600', letterSpacing: 0.5 },
 
+  // Category Tabs
+  categoryTabs: { marginBottom: 15 },
+  pill: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: '#111', marginRight: 8, borderWidth: 1, borderColor: THEME.border, gap: 6 },
+  pillActive: { backgroundColor: THEME.accent, borderColor: THEME.accent },
+  pillText: { fontSize: 10, fontWeight: '800', color: THEME.textMuted, letterSpacing: 1 },
+  pillTextActive: { color: '#000' },
+
   // Carousel Layout - Shifted lower
-  carouselWrapper: { flex: 1, paddingTop: 90, paddingBottom: 140 },
+  carouselWrapper: { flex: 1, paddingTop: 50, paddingBottom: 140 },
   carouselCard: { width: CARD_WIDTH, marginHorizontal: CARD_SPACING / 2, height: CARD_HEIGHT },
   cardPressable: { flex: 1 },
   cardContainer: { flex: 1, borderRadius: 20, overflow: 'hidden', backgroundColor: '#141414', borderWidth: 1, borderColor: '#1E1E1E' },
@@ -352,8 +399,8 @@ const styles = StyleSheet.create({
   cardPriceTypography: { color: THEME.accent, fontSize: 16, fontWeight: '700', textAlign: 'right' },
 
   // Joystick
-  joystickWrapper: { position: 'absolute', bottom: 50, alignSelf: 'center', alignItems: 'center' },
-  mainOrb: { width: 68, height: 68, borderRadius: 34, overflow: 'hidden', borderWidth: 1.5, borderColor: THEME.border },
+  joystickWrapper: { position: 'absolute', bottom: -60, alignSelf: 'center', alignItems: 'center' },
+  mainOrb: { width: 120, height: 120, borderRadius: 60, overflow: 'hidden', borderWidth: 1.5, borderColor: THEME.border },
   orbActive: { borderColor: THEME.accent, transform: [{ scale: 0.94 }] },
   orbGradient: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   orbitalContainer: { position: 'absolute', bottom: 34, alignItems: 'center', justifyContent: 'center' },

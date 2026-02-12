@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: { 
     fontSize: 22, 
-    fontWeight: '900',
+    fontFamily: 'Guardians',
     color: THEME.text,
     letterSpacing: 0.5,
   },

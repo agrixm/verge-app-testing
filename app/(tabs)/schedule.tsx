@@ -454,7 +454,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 24,
-    fontWeight: '900',
+    fontFamily: 'Guardians',
     color: THEME.text,
     letterSpacing: 0.5,
   },

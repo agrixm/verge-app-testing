@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   welcomeText: {
-    fontFamily: 'Orbitron_900Black',
+    fontFamily: 'Guardians',
     fontSize: 30,
     color: '#FFFFFF',
     textAlign: 'left',
