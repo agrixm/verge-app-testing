@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Pressable, StyleSheet, ActivityIndicator, SafeAreaView, Text, Image } from 'react-native';
+import { View, Pressable, StyleSheet, ActivityIndicator, Text, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { authService } from '@/services/auth';

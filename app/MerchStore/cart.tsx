@@ -72,7 +72,7 @@ export default function Cart() {
         <Text style={styles.itemTitle} numberOfLines={1}>
           {item.title}
         </Text>
-        <Text style={styles.itemPrice}>₹{item.price * item.quantity}</Text>
+        <Text style={styles.itemPrice}>₹{item.price}</Text>
       </View>
 
       <View style={styles.qtyBar}>

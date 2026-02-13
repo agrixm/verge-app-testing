@@ -214,7 +214,6 @@ export default function ScheduleScreen() {
             </TouchableOpacity>
             <View style={{ flex: 1, marginLeft: 12 }}>
               <Text style={styles.headerTitle}>SCHEDULE</Text>
-              <Text style={styles.headerSubtitle}>Mission Timeline</Text>
             </View>
           </View>
         </View>
@@ -235,7 +234,6 @@ export default function ScheduleScreen() {
         </View>
 
         <View style={styles.vehicleSection}>
-          <Text style={styles.vLabel}>Current Protocol</Text>
           <Text 
             style={styles.vTitle}
             numberOfLines={1}
@@ -453,16 +451,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontFamily: 'Guardians',
     color: THEME.text,
     letterSpacing: 0.5,
-  },
-  headerSubtitle: {
-    fontSize: 11,
-    color: THEME.textMuted,
-    marginTop: 0,
-    letterSpacing: 0.3,
   },
   tabsContainer: {
     flexDirection: 'row',
@@ -486,8 +478,7 @@ const styles = StyleSheet.create({
   textAccent: { color: THEME.accent },
   
   vehicleSection: { marginBottom: 25, paddingHorizontal: 20 },
-  vLabel: { fontSize: 9, color: THEME.accent, letterSpacing: 3, fontWeight: '700', marginBottom: 4, textTransform: 'uppercase' },
-  vTitle: { fontSize: 24, color: THEME.text, fontWeight: '200', letterSpacing: -0.5 },
+  vTitle: { fontSize: 20, color: THEME.text, fontWeight: '200', letterSpacing: -0.5 },
 
   mainCard: {
     flex: 1, 

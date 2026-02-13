@@ -470,11 +470,11 @@ export default function DashboardScreen() {
     menuProgress.value = withTiming(0, { duration: 200 });
     const drawerRoutes: Record<string, string> = {
       maps: '/maps',
-      epc: '/epc-blog',
-      hpc: '/hpc-blog',
-      sponsors: '/sponsors',
-      contact: '/contact',
-      developers: '/developers',
+      epc: 'settings/info',
+      hpc: 'settings/notification',
+      sponsors: '/settings/sponsors',
+      contact: '/settings/contact',
+      developers: '/settings/developers',
     };
     setTimeout(() => {
       router.push(drawerRoutes[id] || '/');
@@ -637,3 +637,7 @@ export default function DashboardScreen() {
     </View>
   );
 }
+
+// const styles = StyleSheet.create({
+//   container: { flex: 1, backgroundColor: THEME.bg },
+// });

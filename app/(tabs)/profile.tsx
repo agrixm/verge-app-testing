@@ -226,7 +226,6 @@ export default function Profile() {
           </TouchableOpacity>
           <View style={{ flex: 1, marginLeft: 12 }}>
             <Text style={styles.headerTitle}>PROFILE</Text>
-            <Text style={styles.headerSubtitle}>Personnel Data</Text>
           </View>
           
           {!isEditing ? (
@@ -518,8 +517,7 @@ const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingBottom: 8, backgroundColor: THEME.bg },
   headerRow: { flexDirection: 'row', alignItems: 'center' },
   minimalBack: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 24, fontFamily: 'Guardians', color: THEME.text, letterSpacing: 0.5 },
-  headerSubtitle: { fontSize: 11, color: THEME.textMuted, marginTop: 0, letterSpacing: 0.3 },
+  headerTitle: { fontSize: 20, fontFamily: 'Guardians', color: THEME.text, letterSpacing: 0.5 },
   
   actionButton: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: THEME.cardBg,

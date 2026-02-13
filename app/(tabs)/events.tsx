@@ -8,6 +8,7 @@ import {
   Modal,
   StyleSheet,
   TouchableOpacity,
+  Image,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,10 +22,7 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withTiming,
-  withSequence,
-  withDelay,
   useAnimatedScrollHandler,
-  Extrapolation,
 } from 'react-native-reanimated';
 import { useSavedStore } from '../../src/store/useSavedStore';
 
@@ -54,13 +52,14 @@ interface Event {
   status: 'active' | 'inactive';
 }
 
-// ─── 1. Smart Event Card (Self-Contained Logic) ─────────────────────
+// ─── 1. Smart Event Card (Timeline Styled) ─────────────────────────
 type EventCardProps = {
   item: Event;
   onPress: (id: string) => void;
+  isLast?: boolean;
 };
 
-const EventCard = memo(({ item, onPress }: EventCardProps) => {
+const EventCard = memo(({ item, onPress, isLast }: EventCardProps) => {
   const isSaved = useSavedStore(useCallback((state) => state.savedIds.includes(item._id), [item._id]));
   const toggleSave = useSavedStore((state) => state.toggleSave);
   const scale = useSharedValue(1);
@@ -79,68 +78,69 @@ const EventCard = memo(({ item, onPress }: EventCardProps) => {
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
-    shadowOpacity: interpolate(scale.value, [0.98, 1], [0.3, 0]),
   }));
 
   const handlePress = useCallback(() => onPress(item._id), [onPress, item._id]);
   const handleSave = useCallback(() => toggleSave(item._id), [toggleSave, item._id]);
 
   return (
-    <Animated.View style={animatedStyle}>
-      <TouchableOpacity
-        activeOpacity={0.9}
-        onPress={handlePress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        style={styles.cardContainer}
-      >
-        <View style={styles.cardHeader}>
-          <View style={styles.tagContainer}>
-            <View style={styles.tagPill}>
-              <Text style={styles.tagText}>{item.category.toUpperCase()}</Text>
-            </View>
-            {item.requiresTeam && (
-              <View style={styles.tagPillMuted}>
-                <Text style={styles.tagTextMuted}>TEAM</Text>
+    <View style={styles.eventItem}>
+      {/* Timeline Elements */}
+      <View style={[styles.line, isLast && { bottom: '50%' }]} />
+      <View style={styles.dot} />
+
+      <Animated.View style={[animatedStyle, { flex: 1 }]}>
+        <Text style={styles.dateLabel}>{eventDate.toUpperCase()} • {item.time}</Text>
+        
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={handlePress}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          style={styles.card}
+        >
+          {/* Card Top: Title + Bookmark */}
+          <View style={styles.cardTop}>
+            <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
+            <TouchableOpacity onPress={handleSave} hitSlop={12}>
+              <Ionicons 
+                name={isSaved ? 'bookmark' : 'bookmark-outline'} 
+                size={20} 
+                color={isSaved ? THEME.accent : THEME.textMuted} 
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* Card Middle: Details + Image */}
+          <View style={styles.cardMiddle}>
+            <View style={styles.cardDetails}>
+              <View style={styles.infoRow}>
+                <Ionicons name="location-outline" size={14} color={THEME.textMuted} />
+                <Text style={styles.infoText} numberOfLines={1}>{item.venue}</Text>
               </View>
-            )}
-          </View>
-          <TouchableOpacity onPress={handleSave} hitSlop={12}>
-            <Ionicons 
-              name={isSaved ? 'bookmark' : 'bookmark-outline'} 
-              size={18} 
-              color={isSaved ? THEME.accent : THEME.textMuted} 
+              <Text style={styles.categoryBadge}>{item.category.toUpperCase()}</Text>
+            </View>
+            <Image 
+              source={{ uri: `https://picsum.photos/200/200?random=${item._id}` }} 
+              style={styles.eventImg} 
             />
-          </TouchableOpacity>
-        </View>
-
-        <Text style={styles.cardTitle}>{item.title}</Text>
-
-        <View style={styles.cardInfoSection}>
-          <View style={styles.infoRow}>
-            <Ionicons name="calendar-outline" size={14} color={THEME.textMuted} />
-            <Text style={styles.infoText}>{eventDate} • {item.time}</Text>
           </View>
-          <View style={styles.infoRow}>
-            <Ionicons name="location-outline" size={14} color={THEME.textMuted} />
-            <Text style={styles.infoText}>{item.venue}</Text>
-          </View>
-        </View>
 
-        <View style={styles.cardFooter}>
-          <Text style={styles.priceText}>
-            {item.registrationFee > 0 ? `₹${item.registrationFee}` : 'FREE ACCESS'}
-          </Text>
-          
-          <View style={styles.ctaButton}>
-            <Text style={styles.ctaText}>INITIALIZE</Text>
-            <Ionicons name="arrow-forward" size={14} color={THEME.accent} />
+          {/* Card Bottom: Price + CTA */}
+          <View style={styles.cardBottom}>
+            <Text style={[styles.priceText, item.registrationFee === 0 && styles.priceFree]}>
+              {item.registrationFee > 0 ? `₹${item.registrationFee}` : 'FREE'}
+            </Text>
+            
+            <View style={styles.actionBtn}>
+              <Text style={styles.actionBtnText}>REGISTER</Text>
+            </View>
           </View>
-        </View>
-      </TouchableOpacity>
-    </Animated.View>
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
   );
-}, (prev, next) => prev.item._id === next.item._id);
+}, (prev, next) => prev.item._id === next.item._id && prev.isLast === next.isLast);
 
 // ─── 3. Category Pill ───────────────────────────────────────────────
 const CategoryPill = memo(({ item, active, onPress }: { item: string; active: boolean; onPress: (cat: string) => void }) => {
@@ -223,12 +223,16 @@ export default function Events() {
     else router.replace('/dashboard');
   }, [navigation, router]);
 
-  const renderEventItem = useCallback(({ item }: { item: Event }) => (
-    <EventCard item={item} onPress={handleEventPress} />
-  ), [handleEventPress]);
+  const renderEventItem = useCallback(({ item, index }: { item: Event; index: number }) => (
+    <EventCard 
+      item={item} 
+      onPress={handleEventPress} 
+      isLast={index === filteredEvents.length - 1}
+    />
+  ), [handleEventPress, filteredEvents.length]);
 
   const ListHeader = useMemo(() => (
-    <View>
+    <View style={{ marginBottom: 20 }}>
       <Animated.View entering={FadeInDown.duration(420)} style={styles.actionBar}>
         <TouchableOpacity
           onPress={() => setSearchVisible(p => !p)}
@@ -301,7 +305,7 @@ export default function Events() {
           </TouchableOpacity>
           <View style={{ flex: 1, marginLeft: 12 }}>
             <Text style={styles.headerTitle}>EVENTS</Text>
-            <Text style={styles.headerSubtitle}>Choose your mission</Text>
+            <Text style={styles.headerSubtitle}>Upcoming schedule</Text>
           </View>
         </View>
       </Animated.View>
@@ -315,7 +319,7 @@ export default function Events() {
           data={filteredEvents}
           keyExtractor={eventKeyExtractor}
           renderItem={renderEventItem}
-          contentContainerStyle={[styles.listContent, { paddingTop: 0 }]}
+          contentContainerStyle={styles.listContent}
           onScroll={scrollHandler}
           scrollEventThrottle={64}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchEvents} tintColor={THEME.accent} />}
@@ -340,7 +344,13 @@ export default function Events() {
           <FlatList
             data={savedEventsList}
             keyExtractor={(item) => item._id}
-            renderItem={renderEventItem}
+            renderItem={({ item, index }) => (
+              <EventCard 
+                item={item} 
+                onPress={handleEventPress} 
+                isLast={index === savedEventsList.length - 1} 
+              />
+            )}
             contentContainerStyle={{ padding: 20 }}
           />
         </View>
@@ -372,16 +382,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: { 
-    fontSize: 24, 
-    fontFamily: 'Guardians',
+    fontSize: 26, 
+    fontWeight: '800',
     color: THEME.text,
-    letterSpacing: 0.5,
+    letterSpacing: -0.5,
   },
-  headerSubtitle: { 
-    fontSize: 11, 
+  headerSubtitle: {
+    fontSize: 14,
     color: THEME.textMuted,
-    marginTop: 0,
-    letterSpacing: 0.3,
+    marginTop: 2,
   },
 
   listContent: { 
@@ -399,116 +408,140 @@ const styles = StyleSheet.create({
     color: THEME.textMuted 
   },
 
+  // Event Item & Timeline
+  eventItem: {
+    flexDirection: 'row',
+    position: 'relative',
+    paddingLeft: 28,
+    marginBottom: 32,
+  },
+  line: {
+    position: 'absolute',
+    left: 7,
+    top: 5,
+    bottom: -32,
+    width: 2,
+    backgroundColor: THEME.border,
+    zIndex: 0,
+  },
+  dot: {
+    width: 16,
+    height: 16,
+    borderWidth: 3,
+    borderColor: THEME.accent,
+    backgroundColor: THEME.bg,
+    borderRadius: 8,
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    zIndex: 2,
+  },
+  dateLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: THEME.accent,
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+
   // Event Card
-  cardContainer: {
+  card: {
     backgroundColor: THEME.cardBg,
-    borderRadius: 12, // Sharper than chips
-    padding: 20,
-    marginBottom: 16,
+    borderRadius: 16,
+    padding: 16,
     borderWidth: 1,
     borderColor: THEME.border,
-    // For animated highlight
-    shadowColor: THEME.accent,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 15,
-    elevation: 4,
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 3,
   },
-  cardHeader: {
+  cardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  tagContainer: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  tagPill: {
-    backgroundColor: THEME.surface,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: THEME.borderLight,
-  },
-  tagText: {
-    color: THEME.text,
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  tagPillMuted: {
-    backgroundColor: 'transparent',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: THEME.border,
-  },
-  tagTextMuted: {
-    color: THEME.textMuted,
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 1,
+    marginBottom: 12,
   },
   cardTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '800',
     color: THEME.text,
-    marginBottom: 12,
-    letterSpacing: -0.5,
+    flex: 1,
+    marginRight: 8,
+    lineHeight: 22,
   },
-  cardInfoSection: {
-    marginBottom: 20,
+  cardMiddle: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  cardDetails: {
+    flex: 1,
+    justifyContent: 'center',
     gap: 6,
   },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   infoText: {
     fontSize: 13,
     color: THEME.textMuted,
+    flex: 1,
   },
-  cardFooter: {
+  categoryBadge: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: THEME.accent,
+  },
+  eventImg: {
+    width: 64,
+    height: 64,
+    borderRadius: 10,
+    backgroundColor: THEME.surface,
+  },
+  cardBottom: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingTop: 14,
     borderTopWidth: 1,
     borderTopColor: THEME.border,
-    paddingTop: 16,
   },
   priceText: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: THEME.accent,
-    letterSpacing: 1,
-  },
-  ctaButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: THEME.surface,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: THEME.borderLight,
-  },
-  ctaText: {
-    fontSize: 10,
+    fontSize: 18,
     fontWeight: '800',
     color: THEME.text,
-    letterSpacing: 1,
+  },
+  priceFree: {
+    color: '#27ae60',
+  },
+  actionBtn: {
+    backgroundColor: THEME.accent,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    shadowColor: THEME.accent,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  actionBtnText: {
+    color: '#000',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
 
   // Categories
   actionBar: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 12,
-    marginTop: 0,
+    marginBottom: 16,
   },
   iconButton: {
     width: 44,
@@ -537,12 +570,12 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
   catSelectorContainer: {
-    marginBottom: 12,
+    marginBottom: 4,
   },
   pillContainer: {
     paddingHorizontal: 18,
     paddingVertical: 10,
-    borderRadius: 25, // Highly rounded
+    borderRadius: 25,
     borderWidth: 1,
   },
   pillActive: {
@@ -561,7 +594,7 @@ const styles = StyleSheet.create({
 
   // Search
   searchContainer: {
-    marginBottom: 12,
+    marginBottom: 16,
   },
   searchBar: {
     flexDirection: 'row',

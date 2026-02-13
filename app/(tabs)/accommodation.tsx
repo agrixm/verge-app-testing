@@ -226,13 +226,11 @@ export default function Accommodation() {
 
             </TouchableOpacity>
 
-            <View style={{ flex: 1, marginLeft: 12 }}>
+                        <View style={{ flex: 1, marginLeft: 12 }}>
 
-              <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit>ACCOMMODATION</Text>
+                          <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit>ACCOMMODATION</Text>
 
-              <Text style={styles.headerSubtitle}>SECURE BARRACKS</Text>
-
-            </View>
+                        </View>
 
             <TouchableOpacity 
 
@@ -349,7 +347,6 @@ export default function Accommodation() {
 
                   <View style={styles.sectorContent}>
                     <Text style={styles.sectorTitle}>{item.title}</Text>
-                    <Text style={styles.sectorSub}>{item.sub}</Text>
 
                     <View style={styles.indicatorContainer}>
                       <View style={[styles.dot, selectedGender === 'Boys' ? styles.dotActive : styles.dotInactive]} />
@@ -395,17 +392,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: { 
-    fontSize: 22, 
+    fontSize: 20, 
     fontFamily: 'Guardians',
     color: THEME.text,
     letterSpacing: 0.5,
-  },
-  headerSubtitle: { 
-    fontSize: 10, 
-    color: THEME.textMuted,
-    marginTop: 0,
-    letterSpacing: 1,
-    fontWeight: '700',
   },
   myPodButton: {
     width: 40,
@@ -542,17 +532,10 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   sectorTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '900',
     color: THEME.text,
     letterSpacing: 2,
-  },
-  sectorSub: {
-    fontSize: 10,
-    color: THEME.accent,
-    fontWeight: '800',
-    letterSpacing: 4,
-    marginTop: 8,
   },
   indicatorContainer: {
     flexDirection: 'row',
