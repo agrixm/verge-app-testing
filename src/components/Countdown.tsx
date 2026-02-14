@@ -11,7 +11,7 @@ export const Countdown = memo(() => {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
 
   useEffect(() => {
-    const target = new Date('2026-02-14T00:00:00');
+    const target = new Date('2026-03-13T00:00:00');
     
     const update = () => {
       const now = new Date();

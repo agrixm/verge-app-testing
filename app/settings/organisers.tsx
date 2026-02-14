@@ -1,55 +1,46 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { THEME } from '../../src/constants/Theme';
+import { VergeHeader } from '../../src/components/VergeHeader';
 
 export default function Organisers() {
   const router = useRouter();
 
   const CommitteeCard = ({ name, role, department }: { name: string, role: string, department: string }) => (
-    <View className="bg-slate-900/40 border border-slate-800 rounded-3xl p-5 mb-4 flex-row items-center">
-      <View className="w-12 h-12 bg-blue-600/10 rounded-2xl items-center justify-center border border-blue-500/20">
-        <Ionicons name="person-outline" size={24} color="#3b82f6" />
+    <View style={styles.card}>
+      <View style={styles.iconBox}>
+        <Ionicons name="person-outline" size={24} color={THEME.colors.accent} />
       </View>
-      <View className="ml-4 flex-1">
-        <Text className="text-white font-bold text-base">{name}</Text>
-        <Text className="text-blue-500 text-[10px] font-black uppercase tracking-widest mt-0.5">{role}</Text>
-        <Text className="text-slate-500 text-[9px] uppercase mt-1">{department}</Text>
+      <View style={styles.cardInfo}>
+        <Text style={styles.name}>{name.toUpperCase()}</Text>
+        <Text style={styles.role}>{role.toUpperCase()}</Text>
+        <Text style={styles.department}>{department.toUpperCase()}</Text>
       </View>
     </View>
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-950">
-      {/* Header */}
-      <View className="flex-row items-center px-6 py-4 border-b border-slate-900">
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={28} color="white" />
-        </TouchableOpacity>
-        <View className="ml-4">
-          <Text className="text-white text-2xl font-black italic uppercase tracking-tighter">
-            Organisers
-          </Text>
-          <Text className="text-blue-500 text-[8px] font-black uppercase tracking-[3px]">
-            Leadership Council
-          </Text>
-        </View>
-      </View>
+    <SafeAreaView edges={['top']} style={styles.container}>
+      <LinearGradient
+        colors={[THEME.colors.bg, '#0A0A0A', THEME.colors.bg]}
+        style={StyleSheet.absoluteFill}
+      />
+      
+      <VergeHeader title="ORGANISERS" onBack={() => router.back()} />
 
-      <ScrollView className="flex-1 px-6 pt-6" showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         
-        {/* Intro */}
-        <View className="mb-8">
-          <Text className="text-slate-400 text-sm leading-6">
-            Verge 2026 is hosted under the authority of the Organising Committee at <Text className="text-white font-bold">SRM University, Delhi-NCR, Sonepat.</Text> Meet the visionaries leading the charge.
+        <View style={styles.introBox}>
+          <Text style={styles.introText}>
+            Verge 2026 is hosted under the authority of the Organising Committee at <Text style={{ color: THEME.colors.text, fontWeight: '700' }}>SRM University, Delhi-NCR, Sonepat.</Text> Meet the visionaries leading the charge.
           </Text>
         </View>
 
-        {/* Core Leadership Section */}
-        <Text className="text-slate-500 font-black uppercase text-[10px] tracking-[4px] mb-4">
-          Faculty Mentors
-        </Text>
+        <Text style={styles.sectionLabel}>FACULTY MENTORS</Text>
         <CommitteeCard 
           name="Dr. Sanjay Viswanathan" 
           role="Convenor // Verge 2026" 
@@ -61,12 +52,9 @@ export default function Organisers() {
           department="School of Management"
         />
 
-        <View className="h-[1px] bg-slate-900 my-6" />
+        <View style={styles.divider} />
 
-        {/* Student Committee Section */}
-        <Text className="text-slate-500 font-black uppercase text-[10px] tracking-[4px] mb-4">
-          Student Leads
-        </Text>
+        <Text style={styles.sectionLabel}>STUDENT LEADS</Text>
         <CommitteeCard 
           name="Aaryan Malhotra" 
           role="Student Secretary" 
@@ -83,22 +71,43 @@ export default function Organisers() {
           department="Innovation Wing"
         />
 
-        {/* Footer Note */}
-        <View className="mt-10 mb-12 p-6 bg-blue-600/5 border border-blue-500/10 rounded-[32px]">
-          <Text className="text-slate-400 text-[10px] leading-5 text-center italic">
-            "The VERGE Organising Committee is committed to fostering a culture of technical excellence and creative leadership."
+        <View style={styles.quoteBox}>
+          <Text style={styles.quoteText}>
+            &quot;The VERGE Organising Committee is committed to fostering a culture of technical excellence and creative leadership.&quot;
           </Text>
         </View>
 
-        <View className="h-10" />
+        <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Institutional Footer */}
-      <View className="p-8 border-t border-slate-900">
-        <Text className="text-slate-800 text-[8px] font-mono uppercase text-center tracking-[5px]">
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>
           SRM UNIVERSITY DELHI-NCR // 2026
         </Text>
       </View>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: THEME.colors.bg },
+  content: { flex: 1, paddingVertical: 20, paddingHorizontal: 20, paddingTop: 24 },
+  introBox: { marginBottom: 32 },
+  introText: { color: THEME.colors.textMuted, fontSize: 13, lineHeight: 22, fontWeight: '500' },
+  sectionLabel: { color: THEME.colors.textMuted, fontSize: 10, fontWeight: '900', letterSpacing: 4, marginBottom: 16, marginLeft: 4 },
+  card: {
+    backgroundColor: THEME.colors.cardBg, borderRadius: 24, padding: 20,
+    borderWidth: 1, borderColor: THEME.colors.border, flexDirection: 'row',
+    alignItems: 'center', marginBottom: 16,
+  },
+  iconBox: { width: 52, height: 52, borderRadius: 16, backgroundColor: THEME.colors.accentMuted, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: THEME.colors.accentBorder },
+  cardInfo: { marginLeft: 16, flex: 1 },
+  name: { color: THEME.colors.text, fontSize: 15, fontWeight: '800', letterSpacing: 0.5 },
+  role: { color: THEME.colors.accent, fontSize: 9, fontWeight: '900', letterSpacing: 1.5, marginTop: 4 },
+  department: { color: THEME.colors.textMuted, fontSize: 8, fontWeight: '700', marginTop: 2 },
+  divider: { height: 1, backgroundColor: THEME.colors.border, width: '100%', marginVertical: 24 },
+  quoteBox: { marginTop: 24, marginBottom: 40, padding: 24, backgroundColor: 'rgba(255,107,0,0.03)', borderRadius: 32, borderWidth: 1, borderColor: 'rgba(255,107,0,0.08)' },
+  quoteText: { color: THEME.colors.textMuted, fontSize: 11, fontStyle: 'italic', textAlign: 'center', lineHeight: 18 },
+  footer: { padding: 32, borderTopWidth: 1, borderTopColor: THEME.colors.border, alignItems: 'center' },
+  footerText: { color: THEME.colors.borderLight, fontSize: 8, fontWeight: '700', letterSpacing: 5 }
+});

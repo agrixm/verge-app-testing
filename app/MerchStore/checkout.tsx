@@ -5,34 +5,26 @@ import {
   ScrollView,
   Pressable,
   TextInput,
-  Alert,
   ActivityIndicator,
-  Modal,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  Alert,
+  Modal,
+  TouchableOpacity
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useCart } from '../../src/context/CartContext';
 import { authService } from '../../src/services/auth';
 import RazorpayCheckout from 'react-native-razorpay';
+import { THEME } from '../../src/constants/Theme';
+import { VergeHeader } from '../../src/components/VergeHeader';
 
 const SERVER_URL = process.env.EXPO_PUBLIC_API_URL;
 const RAZORPAY_KEY_ID = 'rzp_test_Pv16gbH3ZJn5YP'; 
-
-const THEME = {
-  bg: '#050505',
-  cardBg: '#121212',
-  accent: '#FF6B00',
-  text: '#FFFFFF',
-  textMuted: '#888888',
-  border: '#1F1F1F',
-  borderLight: '#2A2A2A',
-  surface: '#0A0A0A',
-};
 
 export default function Checkout() {
   const router = useRouter();
@@ -59,7 +51,7 @@ export default function Checkout() {
 
   const handlePlaceOrder = () => {
     if (!form.phone || !form.address || !form.city || !form.pincode) {
-      Alert.alert("Required", "Please fill in all shipping details.");
+      Alert.alert('Required', 'Please fill in all shipping details.');
       return;
     }
     setShowPaymentModal(true);
@@ -84,14 +76,14 @@ export default function Checkout() {
           contact: form.phone,
           name: form.name
         },
-        theme: { color: THEME.accent }
+        theme: { color: THEME.colors.accent }
       };
 
       RazorpayCheckout.open(options).then((data: any) => {
         handleFinalizeOrder(data.razorpay_payment_id);
       }).catch((error: any) => {
         const errorMessage = error.description || error.message || JSON.stringify(error);
-        Alert.alert("Payment Failed", `Reason: ${errorMessage}`);
+        Alert.alert('Payment Failed', `Reason: ${errorMessage}`);
       });
     }, 3000);
   };
@@ -109,6 +101,7 @@ export default function Checkout() {
             color: item.selectedColor || "Default",
             price: item.price
           },
+          paddingHorizontal: 20,
           quantity: item.quantity
         })),
         customer: {
@@ -153,7 +146,7 @@ export default function Checkout() {
       }
     } catch (error: any) {
       Alert.alert(
-        "Sync Error",
+        'Sync Error',
         `Payment successful, but order creation failed: ${error.message}. Please contact support with Payment ID: ${paymentId}`
       );
     } finally {
@@ -162,134 +155,129 @@ export default function Checkout() {
   };
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        <LinearGradient
-          colors={[THEME.bg, '#0A0A0A', THEME.bg]}
-          style={{ flex: 1 }}
-        />
-      </View>
+    <View style={styles.container}>
+      <LinearGradient
+        colors={[THEME.colors.bg, '#0A0A0A', THEME.colors.bg]}
+        style={StyleSheet.absoluteFill}
+      />
       
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'} 
-        style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="chevron-back" size={24} color={THEME.text} />
-          </Pressable>
-          <View style={styles.headerTitleContainer}>
-            <Text style={styles.headerTitle}>CHECKOUT</Text>
-            <Text style={styles.headerSubtitle}>Finalize your acquisition</Text>
-          </View>
-        </View>
+      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+        <VergeHeader title="CHECKOUT" onBack={() => router.back()} />
 
-        <ScrollView 
-          showsVerticalScrollIndicator={false} 
-          style={styles.scrollView}
-          contentContainerStyle={{ paddingBottom: 160 }}
-          keyboardShouldPersistTaps="handled"
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+          style={{ flex: 1 }}
         >
-          {/* Review Items Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>REVIEW ITEMS</Text>
-            <View style={styles.card}>
-              {cart?.map((item: any, index: number) => (
-                <View key={item._id} style={[styles.itemRow, index === 0 && { borderTopWidth: 0 }]}>
-                  <Text style={styles.itemName} numberOfLines={1}>{item.title}</Text>
-                  <Text style={styles.itemPrice}>x{item.quantity}  ₹{item.price * item.quantity}</Text>
-                </View>
-              ))}
-              <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>TOTAL BILL</Text>
-                <Text style={styles.totalValue}>₹{finalAmount}</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Shipping Details Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>SHIPPING DETAILS</Text>
-            <View style={styles.card}>
-              <TextInput 
-                style={styles.input} 
-                value={form.name} 
-                onChangeText={(t) => setForm({ ...form, name: t })} 
-                placeholder="NAME" 
-                placeholderTextColor={THEME.textMuted} 
-              />
-              <TextInput 
-                style={styles.input} 
-                keyboardType="phone-pad" 
-                value={form.phone} 
-                onChangeText={(t) => setForm({ ...form, phone: t })} 
-                placeholder="PHONE NUMBER" 
-                placeholderTextColor={THEME.textMuted} 
-              />
-              <TextInput 
-                style={[styles.input, { height: 80, textAlignVertical: 'top' }]} 
-                multiline 
-                numberOfLines={3} 
-                value={form.address} 
-                onChangeText={(t) => setForm({ ...form, address: t })} 
-                placeholder="DETAILED ADDRESS" 
-                placeholderTextColor={THEME.textMuted} 
-              />
-              <View style={styles.row}>
-                <TextInput 
-                  style={[styles.input, { flex: 1, borderRightWidth: 1, borderBottomWidth: 0 }]} 
-                  value={form.city} 
-                  onChangeText={(t) => setForm({ ...form, city: t })} 
-                  placeholder="CITY" 
-                  placeholderTextColor={THEME.textMuted} 
-                />
-                <TextInput 
-                  style={[styles.input, { flex: 1, borderBottomWidth: 0 }]} 
-                  keyboardType="number-pad" 
-                  value={form.pincode} 
-                  onChangeText={(t) => setForm({ ...form, pincode: t })} 
-                  placeholder="PINCODE" 
-                  placeholderTextColor={THEME.textMuted} 
-                />
-              </View>
-            </View>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-
-      {/* Footer CTA */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <Pressable
-          disabled={loading || cart?.length === 0}
-          onPress={handlePlaceOrder}
-          style={({ pressed }) => [
-            styles.payButton,
-            (pressed || loading || cart?.length === 0) && styles.payButtonDisabled,
-          ]}
-        >
-          <LinearGradient
-            colors={['#FF8C00', '#FF6B00', '#E55A00']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.payButtonGradient}
+          <ScrollView 
+            showsVerticalScrollIndicator={false} 
+            style={styles.scrollView}
+            contentContainerStyle={{ paddingBottom: 160 }}
+            keyboardShouldPersistTaps="handled"
           >
-            {loading ? (
-              <ActivityIndicator color="#000" />
-            ) : (
-              <View style={styles.payButtonContent}>
-                <Ionicons name="lock-closed" size={16} color="#000" style={{ marginRight: 8 }} />
-                <Text style={styles.payButtonText}>PAY ₹{finalAmount}</Text>
-                <Ionicons name="arrow-forward" size={18} color="#000" style={{ marginLeft: 8 }} />
+            {/* Review Items Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>REVIEW ITEMS</Text>
+              <View style={styles.card}>
+                {cart?.map((item: any, index: number) => (
+                  <View key={item._id} style={[styles.itemRow, index === 0 && { borderTopWidth: 0 }]}>
+                    <Text style={styles.itemName} numberOfLines={1}>{item.title}</Text>
+                    <Text style={styles.itemPrice}>x{item.quantity}  ₹{item.price * item.quantity}</Text>
+                  </View>
+                ))}
+                <View style={styles.totalRow}>
+                  <Text style={styles.totalLabel}>TOTAL BILL</Text>
+                  <Text style={styles.totalValue}>₹{finalAmount}</Text>
+                </View>
               </View>
-            )}
-          </LinearGradient>
-        </Pressable>
-      </View>
+            </View>
+
+            {/* Shipping Details Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>SHIPPING DETAILS</Text>
+              <View style={styles.card}>
+                <TextInput 
+                  style={styles.input} 
+                  value={form.name} 
+                  onChangeText={(t) => setForm({ ...form, name: t })} 
+                  placeholder="NAME" 
+                  placeholderTextColor={THEME.colors.textMuted} 
+                />
+                <TextInput 
+                  style={styles.input} 
+                  keyboardType="phone-pad" 
+                  value={form.phone} 
+                  onChangeText={(t) => setForm({ ...form, phone: t })} 
+                  placeholder="PHONE NUMBER" 
+                  placeholderTextColor={THEME.colors.textMuted} 
+                />
+                <TextInput 
+                  style={[styles.input, { height: 80, textAlignVertical: 'top' }]} 
+                  multiline 
+                  numberOfLines={3} 
+                  value={form.address} 
+                  onChangeText={(t) => setForm({ ...form, address: t })} 
+                  placeholder="DETAILED ADDRESS" 
+                  placeholderTextColor={THEME.colors.textMuted} 
+                />
+                <View style={styles.row}>
+                  <TextInput 
+                    style={[styles.input, { flex: 1, borderRightWidth: 1, borderBottomWidth: 0 }]} 
+                    value={form.city} 
+                    onChangeText={(t) => setForm({ ...form, city: t })} 
+                    placeholder="CITY" 
+                    placeholderTextColor={THEME.colors.textMuted} 
+                  />
+                  <TextInput 
+                    style={[styles.input, { flex: 1, borderBottomWidth: 0 }]} 
+                    keyboardType="number-pad" 
+                    value={form.pincode} 
+                    onChangeText={(t) => setForm({ ...form, pincode: t })} 
+                    placeholder="PINCODE" 
+                    placeholderTextColor={THEME.colors.textMuted} 
+                  />
+                </View>
+              </View>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+
+        {/* Footer CTA */}
+        <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
+          <Pressable
+            disabled={loading || cart?.length === 0}
+            onPress={handlePlaceOrder}
+            style={({ pressed }) => [
+              styles.payButton,
+              (pressed || loading || cart?.length === 0) && styles.payButtonDisabled,
+            ]}
+          >
+            <LinearGradient
+              colors={['#FF8C00', THEME.colors.accent]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.payButtonGradient}
+            >
+              {loading ? (
+                <ActivityIndicator color="#000" />
+              ) : (
+                <View style={styles.payButtonContent}>
+                  <Ionicons name="lock-closed" size={16} color="#000" style={{ marginRight: 8 }} />
+                  <Text style={styles.payButtonText}>PAY ₹{finalAmount}</Text>
+                  <Ionicons name="arrow-forward" size={18} color="#000" style={{ marginLeft: 8 }} />
+                </View>
+              )}
+            </LinearGradient>
+          </Pressable>
+        </View>
+      </SafeAreaView>
 
       {/* Payment Modal */}
-      <Modal visible={showPaymentModal} transparent={true} animationType="slide">
+      <Modal
+        visible={showPaymentModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPaymentModal(false)}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHandle} />
@@ -305,30 +293,33 @@ export default function Checkout() {
               </View>
               <View style={styles.modalDivider} />
               <View style={styles.modalRow}>
-                <Text style={[styles.modalLabel, { color: THEME.accent }]}>PAYABLE</Text>
-                <Text style={[styles.modalValue, { color: THEME.accent, fontSize: 20 }]}>₹{finalAmount}</Text>
+                <Text style={[styles.modalLabel, { color: THEME.colors.accent }]}>PAYABLE</Text>
+                <Text style={[styles.modalValue, { color: THEME.colors.accent, fontSize: 20 }]}>₹{finalAmount}</Text>
               </View>
             </View>
-            <Pressable
-              onPress={startRazorpayPayment}
-              style={styles.modalButton}
-            >
+            <TouchableOpacity onPress={startRazorpayPayment} style={styles.modalButton}>
               <Text style={styles.modalButtonText}>PROCEED TO GATEWAY</Text>
-            </Pressable>
-            <Pressable onPress={() => setShowPaymentModal(false)} style={styles.modalClose}>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowPaymentModal(false)} style={styles.modalClose}>
               <Text style={styles.modalCloseText}>CANCEL</Text>
-            </Pressable>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* Connection Loader */}
-      <Modal visible={isEstablishingConnection} transparent={true} animationType="fade">
+      {/* Connection Modal */}
+      <Modal
+        visible={isEstablishingConnection}
+        transparent
+        animationType="fade"
+      >
         <View style={styles.loaderOverlay}>
-          <View style={styles.loaderContent}>
-            <ActivityIndicator size="large" color={THEME.accent} />
-            <Text style={styles.loaderText}>ESTABLISHING SECURE CONNECTION</Text>
-            <Text style={styles.loaderSubtext}>DO NOT BACK OR CLOSE APP</Text>
+          <View style={{ backgroundColor: THEME.colors.cardBg, padding: 30, borderRadius: 20, alignItems: 'center', borderWidth: 1, borderColor: THEME.colors.border }}>
+            <Text style={[styles.modalTitle, { marginBottom: 10 }]}>SECURE GATEWAY</Text>
+            <Text style={[styles.modalLabel, { marginBottom: 20 }]}>DO NOT BACK OR CLOSE APP</Text>
+            <View style={styles.loaderContent}>
+              <ActivityIndicator size="large" color={THEME.colors.accent} />
+            </View>
           </View>
         </View>
       </Modal>
@@ -339,35 +330,7 @@ export default function Checkout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: THEME.bg,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 12,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitleContainer: {
-    marginLeft: 12,
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: THEME.text,
-    letterSpacing: 0.5,
-  },
-  headerSubtitle: {
-    fontSize: 11,
-    color: THEME.textMuted,
-    marginTop: 0,
-    letterSpacing: 0.3,
+    backgroundColor: THEME.colors.bg,
   },
   scrollView: {
     flex: 1,
@@ -379,15 +342,15 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 10,
     fontWeight: '800',
-    color: THEME.textMuted,
+    color: THEME.colors.textMuted,
     letterSpacing: 1.5,
     marginBottom: 12,
   },
   card: {
-    backgroundColor: THEME.cardBg,
+    backgroundColor: THEME.colors.cardBg,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: THEME.border,
+    borderColor: THEME.colors.border,
     overflow: 'hidden',
   },
   itemRow: {
@@ -395,17 +358,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: THEME.border,
+    borderTopColor: THEME.colors.border,
   },
   itemName: {
-    color: THEME.text,
+    color: THEME.colors.text,
     fontSize: 14,
     fontWeight: '600',
     flex: 1,
     marginRight: 12,
   },
   itemPrice: {
-    color: THEME.textMuted,
+    color: THEME.colors.textMuted,
     fontSize: 14,
     fontWeight: '700',
   },
@@ -413,28 +376,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     padding: 16,
-    backgroundColor: THEME.surface,
+    backgroundColor: THEME.colors.surface,
     borderTopWidth: 1,
-    borderTopColor: THEME.borderLight,
+    borderTopColor: THEME.colors.borderLight,
   },
   totalLabel: {
-    color: THEME.text,
+    color: THEME.colors.text,
     fontSize: 14,
     fontWeight: '900',
     letterSpacing: 1,
   },
   totalValue: {
-    color: THEME.accent,
+    color: THEME.colors.accent,
     fontSize: 16,
     fontWeight: '900',
   },
   input: {
     padding: 16,
-    color: THEME.text,
+    color: THEME.colors.text,
     fontSize: 14,
     fontWeight: '700',
     borderBottomWidth: 1,
-    borderBottomColor: THEME.border,
+    borderBottomColor: THEME.colors.border,
   },
   row: {
     flexDirection: 'row',
@@ -446,34 +409,16 @@ const styles = StyleSheet.create({
     bottom: 0,
     paddingHorizontal: 20,
     paddingTop: 14,
-    backgroundColor: THEME.bg,
+    backgroundColor: THEME.colors.bg,
     borderTopWidth: 1,
-    borderTopColor: THEME.border,
+    borderTopColor: THEME.colors.border,
     zIndex: 20,
     elevation: 20,
-  },
-  footerSummary: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  footerLabel: {
-    color: THEME.textMuted,
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.5,
-  },
-  footerAmount: {
-    color: THEME.text,
-    fontSize: 20,
-    fontWeight: '900',
-    letterSpacing: 0.5,
   },
   payButton: {
     borderRadius: 16,
     overflow: 'hidden',
-    shadowColor: THEME.accent,
+    shadowColor: THEME.colors.accent,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 16,
@@ -505,17 +450,17 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.7)',
   },
   modalContent: {
-    backgroundColor: THEME.cardBg,
+    backgroundColor: THEME.colors.cardBg,
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     padding: 24,
     borderTopWidth: 1,
-    borderTopColor: THEME.borderLight,
+    borderTopColor: THEME.colors.borderLight,
   },
   modalHandle: {
     width: 40,
     height: 4,
-    backgroundColor: THEME.borderLight,
+    backgroundColor: THEME.colors.borderLight,
     borderRadius: 2,
     alignSelf: 'center',
     marginBottom: 20,
@@ -523,18 +468,18 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '900',
-    color: THEME.text,
+    color: THEME.colors.text,
     letterSpacing: 1,
     marginBottom: 24,
     textAlign: 'center',
   },
   modalSummary: {
-    backgroundColor: THEME.surface,
+    backgroundColor: THEME.colors.surface,
     borderRadius: 16,
     padding: 20,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: THEME.border,
+    borderColor: THEME.colors.border,
   },
   modalRow: {
     flexDirection: 'row',
@@ -543,23 +488,23 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   modalLabel: {
-    color: THEME.textMuted,
+    color: THEME.colors.textMuted,
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 0.5,
   },
   modalValue: {
-    color: THEME.text,
+    color: THEME.colors.text,
     fontSize: 14,
     fontWeight: '900',
   },
   modalDivider: {
     height: 1,
-    backgroundColor: THEME.border,
+    backgroundColor: THEME.colors.border,
     marginVertical: 12,
   },
   modalButton: {
-    backgroundColor: THEME.accent,
+    backgroundColor: THEME.colors.accent,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
@@ -576,7 +521,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalCloseText: {
-    color: THEME.textMuted,
+    color: THEME.colors.textMuted,
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 1,
@@ -589,22 +534,6 @@ const styles = StyleSheet.create({
   },
   loaderContent: {
     alignItems: 'center',
-    padding: 40,
-  },
-  loaderText: {
-    color: THEME.text,
-    fontSize: 14,
-    fontWeight: '900',
-    textAlign: 'center',
-    marginTop: 24,
-    letterSpacing: 1,
-  },
-  loaderSubtext: {
-    color: THEME.accent,
-    fontSize: 11,
-    fontWeight: '800',
-    textAlign: 'center',
-    marginTop: 8,
-    letterSpacing: 2,
+    paddingVertical: 8,
   },
 });

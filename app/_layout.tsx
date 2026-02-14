@@ -1,7 +1,6 @@
 import 'expo-dev-client';
 import '../global.css';
 import { useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -10,7 +9,6 @@ import { authService, Session } from '../src/services/auth';
 import { notificationService } from '../src/services/notification'; 
 import { CartProvider } from '../src/context/CartContext'; 
 import { useFonts, Orbitron_400Regular, Orbitron_700Bold, Orbitron_900Black } from '@expo-google-fonts/orbitron';
-import * as Font from 'expo-font';
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -21,14 +19,15 @@ export default function RootLayout() {
     'Guardians': require('../assets/fonts/Guardians.ttf'),
   });
 
-  const [isBooting, setIsBooting] = useState(true);
   const [user, setUser] = useState<Session | null>(null);
+  const [authInitialized, setAuthInitialized] = useState(false);
   const router = useRouter();
   const segments = useSegments();
 
   useEffect(() => {
     const unsubscribe = authService.onAuthStateChanged(async (currentUser) => {
       setUser(currentUser);
+      setAuthInitialized(true);
       if (currentUser) {
         await authService.syncUserWithBackend(currentUser);
       }
@@ -37,15 +36,7 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
-    if (fontsLoaded) {
-      // Small delay to ensure initialization
-      const timer = setTimeout(() => setIsBooting(false), 500);
-      return () => clearTimeout(timer);
-    }
-  }, [fontsLoaded]);
-
-  useEffect(() => {
-    if (isBooting || !fontsLoaded) return;
+    if (!fontsLoaded || !authInitialized) return;
     const onLoginPage = segments[0] === 'login';
 
     if (!user && !onLoginPage) {
@@ -53,7 +44,7 @@ export default function RootLayout() {
     } else if (user && onLoginPage) {
       router.replace('/dashboard');
     }
-  }, [user, segments, isBooting, router]);
+  }, [user, segments, fontsLoaded, authInitialized, router]);
 
   useEffect(() => {
     const registerNotifications = async () => {
@@ -72,14 +63,8 @@ export default function RootLayout() {
     return cleanup;
   }, []);
 
-  if (isBooting) {
-    return (
-      <SafeAreaProvider>
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#050505' }}>
-          <Text style={{ color: '#888888', fontSize: 10, letterSpacing: 2, fontWeight: '800' }}>INITIALIZING...</Text>
-        </View>
-      </SafeAreaProvider>
-    );
+  if (!fontsLoaded || !authInitialized) {
+    return null;
   }
 
   return (
@@ -88,8 +73,8 @@ export default function RootLayout() {
         <Stack screenOptions={{ headerShown: false, animation: 'fade_from_bottom' }}>
           <Stack.Screen name="index" />
           <Stack.Screen name="login" />
-        <Stack.Screen name="dashboard" options={{ animation: 'none' }} />
-        <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
+          <Stack.Screen name="dashboard" options={{ animation: 'slide_from_right' }} />
+          <Stack.Screen name="(tabs)" options={{ animation: 'slide_from_right' }} />
           <Stack.Screen name="MerchStore/[id]" options={{ presentation: 'modal' }} />
         </Stack>
       </CartProvider>

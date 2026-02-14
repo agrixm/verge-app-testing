@@ -1,23 +1,34 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, memo } from 'react';
 import {
   View,
   Text,
-  ScrollView,
-  Pressable,
   Linking,
   StyleSheet,
+  Share,
+  Image,
+  TouchableOpacity
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
-  FadeInDown,
-  FadeInUp,
-  Easing,
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  useAnimatedScrollHandler,
+  interpolate,
+  Extrapolation,
+  withSequence,
 } from 'react-native-reanimated';
+import { useSavedStore } from '../../src/store/useSavedStore';
+import { THEME } from '../../src/constants/Theme';
+import { VergeHeader } from '../../src/components/VergeHeader';
+import { VergeLoader } from '../../src/components/VergeLoader';
 
 const SERVER_URL = process.env.EXPO_PUBLIC_API_URL;
+const TEST_EVENT_IMAGE = require('../../assets/bidding wars-logo.png');
 
 interface Club {
   _id: string;
@@ -40,74 +51,94 @@ interface Event {
   status: string;
   unstopLink?: string;
   club?: string | null;
+  image?: string;
 }
 
-const THEME = {
-  bg: '#050505',
-  cardBg: '#121212',
-  accent: '#FF6B00',
-  text: '#FFFFFF',
-  textMuted: '#888888',
-  border: '#1F1F1F',
-  borderLight: '#2A2A2A',
-  surface: '#0A0A0A',
-};
+// ─── Info Row ─────────────────────────────────────────────────────────
+const InfoRow = memo(({
+  icon,
+  label,
+  value,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value: string;
+}) => (
+  <View style={styles.infoRow}>
+    <View style={styles.infoIconWrap}>
+      <Ionicons name={icon} size={16} color={THEME.colors.accent} />
+    </View>
+    <View style={styles.infoContent}>
+      <Text style={styles.infoLabel}>{label}</Text>
+      <Text style={styles.infoValue}>{value}</Text>
+    </View>
+  </View>
+));
 
-// ─── Detail Block ─────────────────────────────────────────────────────
-const DetailBlock = ({ icon, label, value, index }: { icon: any; label: string; value: string; index: number }) => {
-  return (
-    <Animated.View
-      entering={FadeInUp.delay(300 + index * 80).duration(500).easing(Easing.out(Easing.cubic))}
-      style={{
-        width: '48%',
-        backgroundColor: THEME.cardBg,
-        borderWidth: 1,
-        borderColor: THEME.border,
-        padding: 16,
-        borderRadius: 12,
-        marginBottom: 12,
-      }}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 6 }}>
-        <Ionicons name={icon} size={14} color={THEME.textMuted} />
-        <Text style={{ color: THEME.textMuted, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 }}>
-          {label}
-        </Text>
-      </View>
-      <Text style={{ color: THEME.text, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>
-        {value}
-      </Text>
-    </Animated.View>
-  );
-};
+// ─── Section Header ──────────────────────────────────────────────────
+const SectionHeader = memo(({ title }: { title: string }) => (
+  <View style={styles.sectionHeader}>
+    <View style={styles.sectionAccent} />
+    <Text style={styles.sectionTitle}>{title}</Text>
+  </View>
+));
 
 export default function EventDetails() {
   const { id } = useLocalSearchParams();
-  const router = useRouter();
   const [event, setEvent] = useState<Event | null>(null);
   const [club, setClub] = useState<Club | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const isSaved = useSavedStore(useCallback((s) => s.savedIds.includes(id as string), [id]));
+  const toggleSave = useSavedStore((s) => s.toggleSave);
+
+  const scrollY = useSharedValue(0);
+  const bookmarkScale = useSharedValue(1);
+  const pageOpacity = useSharedValue(0);
+
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (e) => { 'worklet'; scrollY.value = e.contentOffset.y; },
+  });
+
+  const heroScale = useAnimatedStyle(() => {
+    'worklet';
+    return {
+      transform: [
+        { scale: interpolate(scrollY.value, [-100, 0], [1.1, 1], Extrapolation.CLAMP) },
+      ],
+      opacity: interpolate(scrollY.value, [0, 200], [1, 0.3], Extrapolation.CLAMP),
+    };
+  });
+
+  const bookmarkAnimStyle = useAnimatedStyle(() => {
+    'worklet';
+    return { transform: [{ scale: bookmarkScale.value }] };
+  });
+
+  const pageAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: pageOpacity.value,
+  }));
+
   useEffect(() => {
+    const fetchEventDetails = async () => {
+      try {
+        const response = await fetch(`${SERVER_URL}/api/events/${id}`);
+        const json = await response.json();
+        if (json.status === true && json.data) {
+          setEvent(json.data);
+          if (json.data.club) {
+            fetchClubDetails(json.data.club);
+          }
+        }
+      } catch {
+        if (__DEV__) console.error('Error fetching event details');
+      } finally {
+        setLoading(false);
+        pageOpacity.value = withTiming(1, { duration: 400 });
+      }
+    };
     fetchEventDetails();
   }, [id]);
-
-  const fetchEventDetails = async () => {
-    try {
-      const response = await fetch(`${SERVER_URL}/api/events/${id}`);
-      const json = await response.json();
-      if (json.status === true && json.data) {
-        setEvent(json.data);
-        if (json.data.club) {
-          fetchClubDetails(json.data.club);
-        }
-      }
-    } catch (error) {
-      if (__DEV__) console.error('Error fetching event details');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const fetchClubDetails = async (clubId: string) => {
     try {
@@ -116,221 +147,234 @@ export default function EventDetails() {
       if (json.status === true && json.data) {
         setClub(json.data);
       }
-    } catch (error) {
+    } catch {
       if (__DEV__) console.error('Error fetching club details');
     }
   };
 
-  const handleRegister = async () => {
+  const handleRegister = useCallback(async () => {
     const unstopUrl = event?.unstopLink || 'https://unstop.com/';
     await Linking.openURL(unstopUrl);
-  };
+  }, [event]);
 
-  if (loading) {
-    return (
-      <View style={{ flex: 1, backgroundColor: THEME.bg, justifyContent: 'center', alignItems: 'center' }}>
-        <Text style={{ color: THEME.textMuted, fontSize: 10, letterSpacing: 2 }}>INITIALIZING...</Text>
-      </View>
+  const handleSave = useCallback(() => {
+    bookmarkScale.value = withSequence(
+      withSpring(1.3, { damping: 8, stiffness: 400 }),
+      withSpring(1, { damping: 10, stiffness: 300 }),
     );
-  }
+    toggleSave(id as string);
+  }, [id, toggleSave]);
 
+  const handleShare = useCallback(async () => {
+    if (!event) return;
+    try {
+      await Share.share({
+        message: `Check out "${event.title}" at Verge!\n${event.unstopLink || ''}`,
+      });
+    } catch {}
+  }, [event]);
+
+  if (loading) return (
+    <View style={styles.container}>
+      <VergeLoader message="SYNCING DATA" />
+    </View>
+  );
   if (!event) return null;
 
-  const eventDate = new Date(event.date).toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-  });
+  const eventDate = new Date(event.date);
+  const formattedDate = eventDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+
+  const getCategoryColor = (cat: string) => {
+    switch (cat.toLowerCase()) {
+      case 'tech': return '#3B82F6';
+      case 'non-tech': return '#A855F7';
+      case 'workshop': return '#10B981';
+      default: return THEME.colors.accent;
+    }
+  };
+
+  const catColor = getCategoryColor(event.category);
 
   return (
-    <View style={{ flex: 1, backgroundColor: THEME.bg }}>
-      <LinearGradient
-        colors={[THEME.bg, '#0A0A0A', THEME.bg]}
-        style={StyleSheet.absoluteFill}
-      />
-
-      <SafeAreaView style={{ flex: 1 }}>
-        {/* Header */}
-        <Animated.View
-          entering={FadeInDown.duration(400).easing(Easing.out(Easing.cubic))}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            paddingHorizontal: 20,
-            paddingBottom: 4,
-          }}
-        >
-          <Pressable
-            onPress={() => router.back()}
-            style={({ pressed }) => ({
-              opacity: pressed ? 0.7 : 1,
-              width: 40,
-              height: 40,
-              alignItems: 'center',
-              justifyContent: 'center',
-            })}
-          >
-            <Ionicons name="chevron-back" size={22} color={THEME.text} />
-          </Pressable>
-          <View style={{ marginLeft: 12, flex: 1 }}>
-            <Text style={{ fontSize: 24, fontWeight: '900', color: THEME.text, letterSpacing: 0.5 }}>
-              DETAILS
-            </Text>
-            <Text style={{ fontSize: 11, color: THEME.textMuted, marginTop: 0 }}>Mission briefing</Text>
-          </View>
-        </Animated.View>
-
-        <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120, paddingTop: 10 }}>
-          {/* Category badge */}
-          <Animated.View
-            entering={FadeInDown.delay(100).duration(450).easing(Easing.out(Easing.cubic))}
-            style={{ marginTop: 12, alignSelf: 'flex-start' }}
-          >
-            <View
-              style={{
-                backgroundColor: THEME.surface,
-                borderWidth: 1,
-                borderColor: THEME.borderLight,
-                paddingHorizontal: 12,
-                paddingVertical: 6,
-                borderRadius: 4,
-              }}
-            >
-              <Text style={{ color: THEME.text, fontSize: 10, fontWeight: '700', letterSpacing: 1 }}>
-                {event.category.toUpperCase()}
-              </Text>
-            </View>
-          </Animated.View>
-
-          {/* Title */}
-          <Animated.Text
-            entering={FadeInDown.delay(180).duration(500).easing(Easing.out(Easing.cubic))}
-            style={{
-              color: THEME.text,
-              fontSize: 32,
-              fontWeight: '900',
-              marginTop: 16,
-              lineHeight: 40,
-              letterSpacing: -0.5,
-            }}
-          >
-            {event.title}
-          </Animated.Text>
-
-          {/* Price Highlight */}
-          <Animated.View entering={FadeInDown.delay(220)} style={{ marginTop: 12 }}>
-            <Text style={{ color: THEME.accent, fontWeight: '800', fontSize: 18, letterSpacing: 1 }}>
-              {event.registrationFee > 0 ? `₹${event.registrationFee}` : 'FREE ACCESS'}
-            </Text>
-          </Animated.View>
-
-          {/* Detail grid */}
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginTop: 32 }}>
-            <DetailBlock icon="calendar-outline" label="Date" value={eventDate} index={0} />
-            <DetailBlock icon="time-outline" label="Time" value={event.time} index={1} />
-            <DetailBlock icon="location-outline" label="Venue" value={event.venue} index={2} />
-            <DetailBlock icon="people-outline" label="Type" value={event.requiresTeam ? 'Team' : 'Solo'} index={3} />
-            <DetailBlock icon="person-add-outline" label="Slots" value={event.maxParticipants.toString()} index={4} />
-            <DetailBlock icon="shield-checkmark-outline" label="Status" value="ACTIVE" index={5} />
-          </View>
-
-          {/* Description section */}
-          <Animated.View
-            entering={FadeInUp.delay(600).duration(500).easing(Easing.out(Easing.cubic))}
-            style={{ marginTop: 28 }}
-          >
-            <View style={{ height: 1, backgroundColor: THEME.border, marginBottom: 24 }} />
-
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-              <Ionicons name="document-text-outline" size={16} color={THEME.textMuted} />
-              <Text style={{ color: THEME.textMuted, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>
-                DESCRIPTION
-              </Text>
-            </View>
-
-            <Text style={{ color: 'rgba(255,255,255,0.7)', fontSize: 15, lineHeight: 24, fontWeight: '500' }}>
-              {event.description || 'No tactical briefing provided for this event. Prepare for standard operational procedures.'}
-            </Text>
-          </Animated.View>
-
-          {/* Club section */}
-          {club && (
-            <Animated.View
-              entering={FadeInUp.delay(700).duration(500).easing(Easing.out(Easing.cubic))}
-              style={{ marginTop: 28 }}
-            >
-              <View style={{ height: 1, backgroundColor: THEME.border, marginBottom: 24 }} />
-
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-                <Ionicons name="flag-outline" size={16} color={THEME.textMuted} />
-                <Text style={{ color: THEME.textMuted, fontSize: 10, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 }}>
-                  ORGANIZED BY
-                </Text>
+    <View style={styles.container}>
+      <SafeAreaView edges={['top']} style={styles.safeArea}>
+        <Animated.View style={[{ flex: 1 }, pageAnimatedStyle]}>
+          <VergeHeader 
+            title="EVENT" 
+            rightElement={
+              <View style={styles.topBarActions}>
+                <TouchableOpacity onPress={handleShare} style={styles.iconBtn}>
+                  <Ionicons name="share-outline" size={19} color={THEME.colors.text} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={handleSave} style={styles.iconBtn}>
+                  <Animated.View style={bookmarkAnimStyle}>
+                    <Ionicons
+                      name={isSaved ? 'bookmark' : 'bookmark-outline'}
+                      size={19}
+                      color={isSaved ? THEME.colors.accent : THEME.colors.text}
+                    />
+                  </Animated.View>
+                </TouchableOpacity>
               </View>
+            }
+          />
 
-              <View
-                style={{
-                  backgroundColor: THEME.cardBg,
-                  borderWidth: 1,
-                  borderColor: THEME.border,
-                  padding: 16,
-                  borderRadius: 12,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                }}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: THEME.text, fontWeight: '800', fontSize: 14, letterSpacing: 0.5 }}>
-                    {club.name.toUpperCase()}
+          <Animated.ScrollView
+            onScroll={scrollHandler}
+            scrollEventThrottle={16}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+            removeClippedSubviews={true}
+          >
+            {/* ─── Hero Section ─────────────────────────────────── */}
+            <Animated.View style={heroScale}>
+              <View style={styles.heroSection}>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginBottom: 6 }}>
+                  <Text style={[styles.heroTitle, { flex: 1, marginBottom: 0 }]}>{event.title}</Text>
+                  <Image source={TEST_EVENT_IMAGE} style={styles.eventImage} resizeMode="cover" />
+                </View>
+                <View style={[styles.categoryPill, { backgroundColor: catColor + '14', borderColor: catColor + '30' }]}>
+                  <View style={[styles.categoryDot, { backgroundColor: catColor }]} />
+                  <Text style={[styles.categoryText, { color: catColor }]}> 
+                    {event.category.charAt(0).toUpperCase() + event.category.slice(1)}
                   </Text>
-                  {club.description && (
-                    <Text style={{ color: THEME.textMuted, fontSize: 12, marginTop: 4 }} numberOfLines={2}>
-                      {club.description}
-                    </Text>
-                  )}
                 </View>
               </View>
             </Animated.View>
-          )}
-        </ScrollView>
 
-        {/* Register CTA */}
-        <Animated.View
-          entering={FadeInUp.delay(500).duration(600).easing(Easing.out(Easing.cubic))}
-          style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            paddingHorizontal: 20,
-            paddingBottom: 36,
-            paddingTop: 16,
-            backgroundColor: 'rgba(5, 5, 5, 0.8)',
-          }}
-        >
-          <Pressable
-            onPress={handleRegister}
-            style={({ pressed }) => ({
-              opacity: pressed ? 0.9 : 1,
-              transform: [{ scale: pressed ? 0.98 : 1 }],
-              backgroundColor: THEME.surface,
-              borderWidth: 1,
-              borderColor: THEME.borderLight,
-              borderRadius: 12,
-              paddingVertical: 18,
-              flexDirection: 'row',
-              justifyContent: 'center',
-              alignItems: 'center',
-              gap: 10,
-            })}
-          >
-            <Text style={{ color: THEME.text, fontWeight: '800', fontSize: 14, letterSpacing: 2 }}>
-              REGISTER NOW
-            </Text>
-            <Ionicons name="arrow-forward" size={18} color={THEME.accent} />
-          </Pressable>
+            {/* ─── Details Section ──────────────────────────────── */}
+            <SectionHeader title="Event Details" />
+
+            <View style={styles.infoList}>
+              <InfoRow icon="calendar-outline" label="Date & Time" value={`${formattedDate}, ${event.time}`} />
+              <InfoRow icon="location-outline" label="Venue" value={event.venue} />
+              <InfoRow
+                icon="people-outline"
+                label="Participation"
+                value={event.requiresTeam ? `Team - ${event.maxParticipants} Participants` : `Individual (${event.maxParticipants})`}
+              />
+            </View>
+
+            {/* ─── About Section ────────────────────────────────── */}
+            <SectionHeader title="Description" />
+
+            <View style={styles.descriptionCard}>
+              <Text style={styles.descriptionText}>
+                {event.description || 'No description available for this event yet. Stay tuned for updates!'}
+              </Text>
+            </View>
+
+            {/* ─── Organized By ─────────────────────────────────── */}
+            {club && (
+              <>
+                <SectionHeader title="Organized By" />
+                <View style={[styles.clubCard, { flexDirection: 'column', alignItems: 'flex-start', gap: 14 }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                    <View style={styles.clubAvatar}>
+                      <Text style={styles.clubAvatarText}>
+                        {club.name.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <Text style={[styles.clubName, { fontSize: 18, fontWeight: '800', color: THEME.colors.accent }]}>{club.name}</Text>
+                  </View>
+                  {club.description && (
+                    <Text style={[styles.clubDesc, { color: THEME.colors.text, fontSize: 14, fontWeight: '500', lineHeight: 22, marginTop: 2 }]}>
+                      {club.description}
+                    </Text>
+                  )}
+                  <View style={{ marginTop: 8, width: '100%' }}>
+                    <Text style={{ color: THEME.colors.accent, fontWeight: '700', fontSize: 13, marginBottom: 2 }}>Coordinators</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Ionicons name="person-circle-outline" size={16} color={THEME.colors.textSecondary} />
+                        <Text style={{ color: THEME.colors.textSecondary, fontWeight: '600', fontSize: 13 }}>John Doe</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Ionicons name="call-outline" size={15} color={THEME.colors.textMuted} />
+                        <Text style={{ color: THEME.colors.textMuted, fontWeight: '500', fontSize: 13 }}>+91 9876543210</Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              </>
+            )}
+
+            <View style={{ height: 100 }} />
+          </Animated.ScrollView>
+
+          {/* ─── Register CTA ────────────────────────────────────── */}
+          <View style={styles.ctaContainer}>
+            <LinearGradient
+              colors={['rgba(5,5,5,0)', 'rgba(5,5,5,0.9)', 'rgba(5,5,5,1)']}
+              style={styles.ctaGradient}
+            />
+            <View style={styles.ctaContent}>
+              <View style={styles.ctaPriceWrap}>
+                <Text style={styles.ctaPriceLabel}>
+                  {event.registrationFee > 0 ? 'Fee' : 'Entry'}
+                </Text>
+                <Text style={styles.ctaPriceValue}>
+                  {event.registrationFee > 0 ? `₹${event.registrationFee}` : 'Free'}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={handleRegister}
+                style={styles.ctaButton}
+              >
+                <LinearGradient
+                  colors={['#FF8C00', THEME.colors.accent]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.ctaGradientBtn}
+                >
+                  <Text style={styles.ctaButtonText}>Register Now</Text>
+                  <Ionicons name="arrow-forward" size={16} color="#000" />
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
         </Animated.View>
       </SafeAreaView>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: THEME.colors.bg },
+  safeArea: { flex: 1 },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 40 },
+  topBarActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  iconBtn: { width: 42, height: 42, borderRadius: 12, backgroundColor: THEME.colors.surfaceElevated, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: THEME.colors.border },
+  heroSection: { paddingTop: 8, paddingBottom: 28 },
+  heroTitle: { color: THEME.colors.text, fontSize: 30, fontFamily: THEME.fonts.primaryBold, lineHeight: 38, letterSpacing: -0.3, marginBottom: 14 },
+  eventImage: { width: 80, height: 80 },
+  categoryPill: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, gap: 6, marginBottom: 14 },
+  categoryDot: { width: 5, height: 5, borderRadius: 3 },
+  categoryText: { fontSize: 12, fontWeight: '600', letterSpacing: 0.3 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
+  sectionAccent: { width: 3, height: 16, borderRadius: 2, backgroundColor: THEME.colors.accent },
+  sectionTitle: { color: THEME.colors.text, fontSize: 16, fontWeight: '700', letterSpacing: 0.2 },
+  infoList: { backgroundColor: THEME.colors.cardBg, borderWidth: 1, borderColor: THEME.colors.border, borderRadius: 14, overflow: 'hidden', marginBottom: 32 },
+  infoRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: THEME.colors.border, gap: 12 },
+  infoIconWrap: { width: 36, height: 36, borderRadius: 10, backgroundColor: 'rgba(255, 107, 0, 0.08)', alignItems: 'center', justifyContent: 'center' },
+  infoContent: { flex: 1, gap: 1 },
+  infoLabel: { color: THEME.colors.textMuted, fontSize: 11, fontWeight: '600', letterSpacing: 0.5, textTransform: 'uppercase' },
+  infoValue: { color: THEME.colors.text, fontSize: 14, fontWeight: '600' },
+  descriptionCard: { backgroundColor: THEME.colors.cardBg, borderWidth: 1, borderColor: THEME.colors.border, borderRadius: 14, padding: 18, marginBottom: 32 },
+  descriptionText: { color: THEME.colors.textSecondary, fontSize: 14, lineHeight: 24, fontWeight: '400' },
+  clubCard: { backgroundColor: THEME.colors.cardBg, borderWidth: 1, borderColor: THEME.colors.border, borderRadius: 14, padding: 16, marginBottom: 32 },
+  clubAvatar: { width: 44, height: 44, borderRadius: 12, backgroundColor: 'rgba(255, 107, 0, 0.08)', borderWidth: 1, borderColor: 'rgba(255, 107, 0, 0.15)', alignItems: 'center', justifyContent: 'center' },
+  clubAvatarText: { color: THEME.colors.accent, fontSize: 18, fontWeight: '800' },
+  clubName: { color: THEME.colors.text, fontSize: 15, fontWeight: '700' },
+  clubDesc: { color: THEME.colors.textMuted, fontSize: 12, lineHeight: 17 },
+  ctaContainer: { position: 'absolute', bottom: 0, left: 0, right: 0 },
+  ctaGradient: { position: 'absolute', top: -30, left: 0, right: 0, height: 30 },
+  ctaContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 12, paddingBottom: 34, backgroundColor: THEME.colors.bg },
+  ctaPriceWrap: { gap: 1 },
+  ctaPriceLabel: { color: THEME.colors.textMuted, fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  ctaPriceValue: { color: THEME.colors.text, fontSize: 20, fontWeight: '800' },
+  ctaButton: { borderRadius: 14, overflow: 'hidden' },
+  ctaGradientBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 28, paddingVertical: 16 },
+  ctaButtonText: { color: '#000', fontSize: 15, fontWeight: '800', letterSpacing: 0.3 },
+});

@@ -7,37 +7,37 @@ import {
   TextInput,
   Modal,
   StyleSheet,
-  TouchableOpacity,
+  Pressable,
+  StatusBar,
   Image,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useNavigation } from '@react-navigation/native';
-import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   FadeInDown,
-  Easing,
-  interpolate,
+  FadeIn,
   useAnimatedStyle,
   useSharedValue,
-  withTiming,
+  withSpring,
+  withSequence,
   useAnimatedScrollHandler,
 } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useSavedStore } from '../../src/store/useSavedStore';
+import { THEME } from '../../src/constants/Theme';
+import { VergeHeader } from '../../src/components/VergeHeader';
+import { VergeLoader } from '../../src/components/VergeLoader';
 
 const SERVER_URL = process.env.EXPO_PUBLIC_API_URL;
 const CATEGORIES = ['all', 'tech', 'non-tech', 'workshop', 'other'];
-
-const THEME = {
-  bg: '#050505',
-  cardBg: '#121212',
-  accent: '#FF6B00',
-  text: '#FFFFFF',
-  textMuted: '#888888',
-  border: '#1F1F1F',
-  borderLight: '#2A2A2A',
-  surface: '#0A0A0A',
+const CATEGORY_ICONS: Record<string, any> = {
+  all: 'grid-outline',
+  tech: 'code-slash-outline',
+  'non-tech': 'people-outline',
+  workshop: 'construct-outline',
+  other: 'ellipsis-horizontal-outline',
 };
 
 interface Event {
@@ -52,114 +52,124 @@ interface Event {
   status: 'active' | 'inactive';
 }
 
-// ─── 1. Smart Event Card (Timeline Styled) ─────────────────────────
-type EventCardProps = {
-  item: Event;
-  onPress: (id: string) => void;
-  isLast?: boolean;
-};
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-const EventCard = memo(({ item, onPress, isLast }: EventCardProps) => {
-  const isSaved = useSavedStore(useCallback((state) => state.savedIds.includes(item._id), [item._id]));
-  const toggleSave = useSavedStore((state) => state.toggleSave);
+// ─── Event Card ─────────────────────────────────────────────────────
+const EventCard = memo(({ item, index, onPress }: { item: Event; index: number; onPress: (id: string) => void }) => {
+  const isSaved = useSavedStore(useCallback((s) => s.savedIds.includes(item._id), [item._id]));
+  const toggleSave = useSavedStore((s) => s.toggleSave);
   const scale = useSharedValue(1);
+  const bookmarkScale = useSharedValue(1);
 
-  const eventDate = useMemo(() => 
-    new Date(item.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }), 
-  [item.date]);
-  
-  const handlePressIn = () => {
-    scale.value = withTiming(0.98, { duration: 150 });
-  };
+  const eventDate = useMemo(() => {
+    const d = new Date(item.date);
+    return {
+      day: d.toLocaleDateString('en-GB', { day: 'numeric' }),
+      month: d.toLocaleDateString('en-GB', { month: 'short' }).toUpperCase(),
+      weekday: d.toLocaleDateString('en-GB', { weekday: 'short' }).toUpperCase(),
+    };
+  }, [item.date]);
 
-  const handlePressOut = () => {
-    scale.value = withTiming(1, { duration: 150 });
-  };
+  const handlePressIn = useCallback(() => { 'worklet'; scale.value = withSpring(0.97, { damping: 15, stiffness: 400 }); }, []);
+  const handlePressOut = useCallback(() => { 'worklet'; scale.value = withSpring(1, { damping: 12, stiffness: 300 }); }, []);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
+  const animatedCard = useAnimatedStyle(() => {
+    'worklet';
+    return {
+      transform: [{ scale: scale.value }],
+    };
+  });
+
+  const animatedBookmark = useAnimatedStyle(() => {
+    'worklet';
+    return {
+      transform: [{ scale: bookmarkScale.value }],
+    };
+  });
+
 
   const handlePress = useCallback(() => onPress(item._id), [onPress, item._id]);
-  const handleSave = useCallback(() => toggleSave(item._id), [toggleSave, item._id]);
+  const handleSave = useCallback(() => {
+    bookmarkScale.value = withSequence(
+      withSpring(1.4, { damping: 8, stiffness: 400 }),
+      withSpring(1, { damping: 10, stiffness: 300 }),
+    );
+    toggleSave(item._id);
+  }, [toggleSave, item._id]);
 
   return (
-    <View style={styles.eventItem}>
-      {/* Timeline Elements */}
-      <View style={[styles.line, isLast && { bottom: '50%' }]} />
-      <View style={styles.dot} />
-
-      <Animated.View style={[animatedStyle, { flex: 1 }]}>
-        <Text style={styles.dateLabel}>{eventDate.toUpperCase()} • {item.time}</Text>
-        
-        <TouchableOpacity
-          activeOpacity={0.9}
+    <Animated.View
+      entering={FadeInDown.duration(300).delay(index * 30).springify().damping(18)}
+      style={styles.cardWrapper}
+    >
+      <Animated.View style={animatedCard}>
+        <Pressable
           onPress={handlePress}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
           style={styles.card}
         >
-          {/* Card Top: Title + Bookmark */}
-          <View style={styles.cardTop}>
-            <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
-            <TouchableOpacity onPress={handleSave} hitSlop={12}>
-              <Ionicons 
-                name={isSaved ? 'bookmark' : 'bookmark-outline'} 
-                size={20} 
-                color={isSaved ? THEME.accent : THEME.textMuted} 
-              />
-            </TouchableOpacity>
-          </View>
+          <View style={styles.cardRimLight} />
+          <View style={styles.cardBody}>
+            <View style={styles.dateCol}>
+              <Text style={styles.dateDay}>{eventDate.day}</Text>
+              <Text style={styles.dateMonth}>{eventDate.month}</Text>
+              <View style={styles.dateDivider} />
+              <Text style={styles.dateWeekday}>{eventDate.weekday}</Text>
+            </View>
 
-          {/* Card Middle: Details + Image */}
-          <View style={styles.cardMiddle}>
-            <View style={styles.cardDetails}>
-              <View style={styles.infoRow}>
-                <Ionicons name="location-outline" size={14} color={THEME.textMuted} />
-                <Text style={styles.infoText} numberOfLines={1}>{item.venue}</Text>
+            <View style={styles.verticalDivider} />
+
+            <View style={styles.contentCol}>
+              <View style={styles.titleRow}>
+                <Text style={styles.cardTitle} numberOfLines={2}>{item.title}</Text>
+                <AnimatedPressable onPress={handleSave} hitSlop={14} style={[styles.bookmarkBtn]}>
+                  <Animated.View style={animatedBookmark}>
+                    <Ionicons
+                      name={isSaved ? 'bookmark' : 'bookmark-outline'}
+                      size={18}
+                      color={isSaved ? THEME.colors.accent : THEME.colors.textMuted}
+                    />
+                  </Animated.View>
+                </AnimatedPressable>
               </View>
-              <Text style={styles.categoryBadge}>{item.category.toUpperCase()}</Text>
-            </View>
-            <Image 
-              source={{ uri: `https://picsum.photos/200/200?random=${item._id}` }} 
-              style={styles.eventImg} 
-            />
-          </View>
 
-          {/* Card Bottom: Price + CTA */}
-          <View style={styles.cardBottom}>
-            <Text style={[styles.priceText, item.registrationFee === 0 && styles.priceFree]}>
-              {item.registrationFee > 0 ? `₹${item.registrationFee}` : 'FREE'}
-            </Text>
-            
-            <View style={styles.actionBtn}>
-              <Text style={styles.actionBtnText}>REGISTER</Text>
+              <View style={styles.eventMetaBlock}>
+                <View style={styles.eventMetaRow}>
+                  <Ionicons name="location-outline" size={14} color={THEME.colors.textSecondary} />
+                  <Text style={styles.eventMetaText} numberOfLines={1}>{item.venue}</Text>
+                </View>
+                <Text style={styles.eventMetaSubText} numberOfLines={1}>
+                  {item.category.charAt(0).toUpperCase() + item.category.slice(1)} {'\u2022'} {item.requiresTeam ? 'Team' : 'Solo'}
+                </Text>
+              </View>
+
+              <View style={styles.cardFooter}>
+                {item.registrationFee > 0 ? (
+                  <View style={styles.priceRow}>
+                    <Text style={styles.priceSymbol}>₹</Text>
+                    <Text style={styles.priceValue}>{item.registrationFee}</Text>
+                  </View>
+                ) : (
+                  <View style={styles.freePill}>
+                    <Text style={styles.freeText}>FREE</Text>
+                  </View>
+                )}
+
+                <LinearGradient
+                  colors={['#FF8C00', THEME.colors.accent]}
+                  style={styles.registerBtn}
+                >
+                  <View style={styles.registerBtnHighlight} />
+                  <Text style={styles.registerBtnText}>Register</Text>
+                  <Ionicons name="arrow-forward" size={13} color="#000" />
+                </LinearGradient>
+              </View>
             </View>
           </View>
-        </TouchableOpacity>
+        </Pressable>
       </Animated.View>
-    </View>
-  );
-}, (prev, next) => prev.item._id === next.item._id && prev.isLast === next.isLast);
-
-// ─── 3. Category Pill ───────────────────────────────────────────────
-const CategoryPill = memo(({ item, active, onPress }: { item: string; active: boolean; onPress: (cat: string) => void }) => {
-  return (
-    <TouchableOpacity
-      activeOpacity={0.8}
-      onPress={() => onPress(item)}
-      style={[
-        styles.pillContainer, 
-        active ? styles.pillActive : styles.pillInactive
-      ]}
-    >
-      <Text style={[
-        styles.pillText, 
-        { color: active ? '#000000' : 'rgba(255, 255, 255, 0.6)' }
-      ]}>
-        {item.replace('-', ' ').toUpperCase()}
-      </Text>
-    </TouchableOpacity>
+    </Animated.View>
   );
 });
 
@@ -167,10 +177,9 @@ const CategoryPill = memo(({ item, active, onPress }: { item: string; active: bo
 export default function Events() {
   const router = useRouter();
   const navigation = useNavigation();
-  const insets = useSafeAreaInsets();
-  
-  const savedCount = useSavedStore(state => state.savedIds.length);
-  const savedIds = useSavedStore(state => state.savedIds);
+
+  const savedCount = useSavedStore(s => s.savedIds.length);
+  const savedIds = useSavedStore(s => s.savedIds);
 
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
@@ -181,22 +190,16 @@ export default function Events() {
   const [searchVisible, setSearchVisible] = useState(false);
 
   const scrollY = useSharedValue(0);
-  const scrollHandler = useAnimatedScrollHandler((event) => {
-    scrollY.value = event.contentOffset.y;
-  });
-
-  const headerAnimStyle = useAnimatedStyle(() => {
-    return { opacity: 1, transform: [{ translateY: 0 }] };
+  const scrollHandler = useAnimatedScrollHandler((e) => {
+    scrollY.value = e.contentOffset.y;
   });
 
   const fetchEvents = useCallback(async () => {
     try {
-      const response = await fetch(`${SERVER_URL}/api/events`);
-      const result = await response.json();
-      if (response.ok) setEvents(result.data || []);
-    } catch {
-      // Handle error
-    } finally {
+      const res = await fetch(`${SERVER_URL}/api/events`);
+      const json = await res.json();
+      if (res.ok) setEvents(json.data || []);
+    } catch { /* */ } finally {
       setLoading(false);
       setRefreshing(false);
     }
@@ -204,15 +207,15 @@ export default function Events() {
 
   useEffect(() => { fetchEvents(); }, [fetchEvents]);
 
-  const filteredEvents = useMemo(() => {
-    return events.filter((event) => {
-      const matchesSearch = !searchQuery || event.title.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = selectedCategory === 'all' || event.category === selectedCategory;
-      return matchesSearch && matchesCategory && event.status === 'active';
-    });
-  }, [events, searchQuery, selectedCategory]);
+  const filteredEvents = useMemo(() =>
+    events.filter((e) => {
+      const matchSearch = !searchQuery || e.title.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchCat = selectedCategory === 'all' || e.category === selectedCategory;
+      return matchSearch && matchCat && e.status === 'active';
+    }),
+    [events, searchQuery, selectedCategory]);
 
-  const savedEventsList = useMemo(() => events.filter((event) => savedIds.includes(event._id)), [events, savedIds]);
+  const savedEventsList = useMemo(() => events.filter((e) => savedIds.includes(e._id)), [events, savedIds]);
 
   const handleEventPress = useCallback((id: string) => {
     router.push({ pathname: 'EventDetails/[id]', params: { id } });
@@ -223,424 +226,266 @@ export default function Events() {
     else router.replace('/dashboard');
   }, [navigation, router]);
 
+  const handleRefresh = useCallback(() => { setRefreshing(true); fetchEvents(); }, [fetchEvents]);
+
   const renderEventItem = useCallback(({ item, index }: { item: Event; index: number }) => (
-    <EventCard 
-      item={item} 
-      onPress={handleEventPress} 
-      isLast={index === filteredEvents.length - 1}
-    />
-  ), [handleEventPress, filteredEvents.length]);
+    <EventCard item={item} index={index} onPress={handleEventPress} />
+  ), [handleEventPress]);
 
-  const ListHeader = useMemo(() => (
-    <View style={{ marginBottom: 20 }}>
-      <Animated.View entering={FadeInDown.duration(420)} style={styles.actionBar}>
-        <TouchableOpacity
-          onPress={() => setSearchVisible(p => !p)}
-          style={[styles.iconButton, searchVisible && { backgroundColor: THEME.accent, borderColor: THEME.accent }]}
-        >
-          <Ionicons name="search" size={18} color={searchVisible ? '#000000' : THEME.text} />
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          onPress={() => setIsSavedModalVisible(true)}
-          style={[styles.iconButton, savedCount > 0 && { borderColor: THEME.accent }]}
-        >
-          <View>
-            <Ionicons name={savedCount > 0 ? 'bookmark' : 'bookmark-outline'} size={18} color={savedCount > 0 ? THEME.accent : THEME.text} />
-            {savedCount > 0 && (
-              <View style={[styles.badge, { backgroundColor: THEME.accent }]}>
-                <Text style={styles.badgeText}>{savedCount}</Text>
-              </View>
-            )}
-          </View>
-        </TouchableOpacity>
-
-        <View style={{ flex: 1 }} />
-      </Animated.View>
-
-      {searchVisible && (
-         <Animated.View entering={FadeInDown.duration(300)} style={styles.searchContainer}>
-            <View style={styles.searchBar}>
-              <Ionicons name="search" size={16} color={THEME.textMuted} />
-              <TextInput
-                placeholder="SEARCH EVENTS..."
-                placeholderTextColor={THEME.textMuted}
-                style={styles.searchInput}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-                autoFocus
-              />
-              <TouchableOpacity onPress={() => { setSearchVisible(false); setSearchQuery(''); }}>
-                <Ionicons name="close" size={16} color={THEME.textMuted} />
-              </TouchableOpacity>
-            </View>
-         </Animated.View>
-      )}
-
-      <View style={styles.catSelectorContainer}>
-        <FlatList
-          horizontal
-          data={CATEGORIES}
-          keyExtractor={categoryKeyExtractor}
-          showsHorizontalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <CategoryPill item={item} active={selectedCategory === item} onPress={setSelectedCategory} />
-          )}
-          ItemSeparatorComponent={CategorySeparator}
-        />
-      </View>
-    </View>
-  ), [searchVisible, searchQuery, savedCount, selectedCategory]);
+  const keyExtractor = useCallback((i: Event) => i._id, []);
 
   return (
-    <SafeAreaView edges={['top']} style={styles.container}>
-      <LinearGradient
-        colors={[THEME.bg, '#0A0A0A', THEME.bg]}
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      <Image
+        source={require('../../assets/events-bg.png')}
         style={StyleSheet.absoluteFill}
+        resizeMode="cover"
       />
-      <Animated.View style={[{ paddingHorizontal: 20, paddingBottom: 8, backgroundColor: THEME.bg }, headerAnimStyle]}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity onPress={handleBack} style={styles.minimalBack}>
-             <Ionicons name="chevron-back" size={22} color={THEME.text} />
-          </TouchableOpacity>
-          <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={styles.headerTitle}>EVENTS</Text>
-            <Text style={styles.headerSubtitle}>Upcoming schedule</Text>
-          </View>
-        </View>
-      </Animated.View>
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.85)' }]} />
 
-      {loading ? (
-        <View style={styles.loadingContainer}>
-           <Text style={styles.loadingText}>INITIALIZING...</Text>
-        </View>
-      ) : (
-        <Animated.FlatList
-          data={filteredEvents}
-          keyExtractor={eventKeyExtractor}
-          renderItem={renderEventItem}
-          contentContainerStyle={styles.listContent}
-          onScroll={scrollHandler}
-          scrollEventThrottle={64}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={fetchEvents} tintColor={THEME.accent} />}
-          initialNumToRender={4}
-          maxToRenderPerBatch={3}
-          windowSize={5}
-          updateCellsBatchingPeriod={100}
-          removeClippedSubviews={true}
-          ListHeaderComponent={ListHeader}
+      <SafeAreaView edges={['top']} style={{ flex: 1 }}>
+        <VergeHeader
+          title="EVENTS"
+          onBack={handleBack}
+          rightElement={
+            <View style={styles.headerActions}>
+              <Pressable
+                onPress={() => setSearchVisible(p => !p)}
+                style={[styles.hdrIconBtn, searchVisible && styles.hdrIconBtnActive]}
+              >
+                <Ionicons name={searchVisible ? 'close' : 'search'} size={18} color={searchVisible ? THEME.colors.accent : THEME.colors.textSecondary} />
+              </Pressable>
+
+              <Pressable
+                onPress={() => setIsSavedModalVisible(true)}
+                style={[styles.hdrIconBtn, savedCount > 0 && styles.hdrIconBtnActive]}
+              >
+                <Ionicons name={savedCount > 0 ? 'bookmark' : 'bookmark-outline'} size={18} color={savedCount > 0 ? THEME.colors.accent : THEME.colors.textSecondary} />
+                {savedCount > 0 && (
+                  <View style={styles.badge}><Text style={styles.badgeTxt}>{savedCount}</Text></View>
+                )}
+              </Pressable>
+            </View>
+          }
         />
-      )}
 
-      {/* Saved Modal */}
-      <Modal visible={isSavedModalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setIsSavedModalVisible(false)}>
-        <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <Text style={[styles.modalTitle, { color: THEME.accent }]}>Saved Logs</Text>
-            <TouchableOpacity onPress={() => setIsSavedModalVisible(false)} style={styles.closeButton}>
-              <Ionicons name="close" size={18} color={THEME.accent} />
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            data={savedEventsList}
-            keyExtractor={(item) => item._id}
-            renderItem={({ item, index }) => (
-              <EventCard 
-                item={item} 
-                onPress={handleEventPress} 
-                isLast={index === savedEventsList.length - 1} 
-              />
-            )}
-            contentContainerStyle={{ padding: 20 }}
+        {loading ? (
+          <VergeLoader message="SCANNING EVENTS" />
+        ) : (
+          <Animated.FlatList
+            data={filteredEvents}
+            keyExtractor={keyExtractor}
+            renderItem={renderEventItem}
+            contentContainerStyle={[styles.listContent, filteredEvents.length === 0 && { flex: 1 }]}
+            onScroll={scrollHandler}
+            scrollEventThrottle={16}
+            showsVerticalScrollIndicator={false}
+            initialNumToRender={6}
+            maxToRenderPerBatch={4}
+            windowSize={5}
+            removeClippedSubviews={true}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={THEME.colors.accent} progressBackgroundColor={THEME.colors.surface} />
+            }
+            ListHeaderComponent={
+              <View style={styles.listHeader}>
+                {searchVisible && (
+                  <Animated.View entering={FadeInDown.duration(350).springify().damping(16)} style={styles.searchBar}>
+                    <Ionicons name="search" size={16} color={THEME.colors.textMuted} />
+                    <TextInput
+                      placeholder="Search events..."
+                      placeholderTextColor={THEME.colors.textMuted}
+                      style={styles.searchInput}
+                      value={searchQuery}
+                      onChangeText={setSearchQuery}
+                      autoFocus
+                      selectionColor={THEME.colors.accent}
+                    />
+                    {searchQuery.length > 0 && (
+                      <Pressable onPress={() => setSearchQuery('')}>
+                        <Ionicons name="close-circle" size={18} color={THEME.colors.textMuted} />
+                      </Pressable>
+                    )}
+                  </Animated.View>
+                )}
+
+                <Animated.View entering={FadeInDown.duration(400).delay(200)}>
+                  <FlatList
+                    horizontal
+                    data={CATEGORIES}
+                    keyExtractor={(i) => i}
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.catList}
+                    renderItem={({ item }) => (
+                      <Pressable
+                        onPress={() => setSelectedCategory(item)}
+                        style={[styles.pill, selectedCategory === item && styles.pillActive]}
+                      >
+                        <Ionicons name={CATEGORY_ICONS[item]} size={14} color={selectedCategory === item ? THEME.colors.accent : '#A0A0A0'} />
+                        <Text style={[styles.pillText, selectedCategory === item && styles.pillTextActive]}>
+                          {item === 'non-tech' ? 'NON-TECH' : item.toUpperCase()}
+                        </Text>
+                      </Pressable>
+                    )}
+                  />
+                </Animated.View>
+
+                <View style={styles.resultsBar}>
+                  <View style={styles.resultsLine} />
+                  <Text style={styles.resultsText}>{filteredEvents.length} EVENT{filteredEvents.length !== 1 ? 'S' : ''}</Text>
+                  <View style={styles.resultsLine} />
+                </View>
+              </View>
+            }
+            ListEmptyComponent={
+              <Animated.View entering={FadeIn.duration(700)} style={styles.emptyState}>
+                <View style={styles.emptyIcon}>
+                  <Ionicons name="calendar-outline" size={44} color={THEME.colors.textMuted} />
+                </View>
+                <Text style={styles.emptyTitle}>No Events Found</Text>
+                <Text style={styles.emptySubtitle}>Try adjusting your filters or search</Text>
+              </Animated.View>
+            }
           />
-        </View>
-      </Modal>
-    </SafeAreaView>
+        )}
+
+        <Modal visible={isSavedModalVisible} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setIsSavedModalVisible(false)}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHandle} />
+            <VergeHeader 
+              title="SAVED" 
+              onBack={() => setIsSavedModalVisible(false)}
+              rightElement={
+                <View style={{ paddingRight: 8 }}>
+                   <Text style={styles.modalSubtitle}>{savedEventsList.length} ITEMS</Text>
+                </View>
+              }
+            />
+
+            <FlatList
+              data={savedEventsList}
+              keyExtractor={(item) => item._id}
+              renderItem={({ item, index }) => (
+                <EventCard item={item} index={index} onPress={(id) => { setIsSavedModalVisible(false); handleEventPress(id); }} />
+              )}
+              contentContainerStyle={[styles.modalList, savedEventsList.length === 0 && { flex: 1 }]}
+              showsVerticalScrollIndicator={false}
+              removeClippedSubviews={false}
+              ListEmptyComponent={
+                <View style={styles.emptyState}>
+                  <View style={styles.emptyIcon}><Ionicons name="bookmark-outline" size={44} color={THEME.colors.textMuted} /></View>
+                  <Text style={styles.emptyTitle}>No Saved Events</Text>
+                  <Text style={styles.emptySubtitle}>Bookmark events to find them here</Text>
+                </View>
+              }
+            />
+          </View>
+        </Modal>
+      </SafeAreaView>
+    </View>
   );
 }
 
-// ─── Stable helpers (outside render cycle) ─────────────────────────
-const eventKeyExtractor = (item: Event) => item._id;
-const categoryKeyExtractor = (item: string) => item;
-const CategorySeparator = memo(() => <View style={{ width: 8 }} />);
-
-// ─── STYLES ─────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: THEME.bg 
+  container: { flex: 1, backgroundColor: '#000' },
+  headerActions: { flexDirection: 'row', gap: 8 },
+  hdrIconBtn: {
+    width: 42, height: 42, borderRadius: 13, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.07)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.05)',
   },
-  
-  headerRow: { 
-    flexDirection: 'row', 
-    alignItems: 'center' 
-  },
-  minimalBack: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: { 
-    fontSize: 26, 
-    fontWeight: '800',
-    color: THEME.text,
-    letterSpacing: -0.5,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: THEME.textMuted,
-    marginTop: 2,
-  },
-
-  listContent: { 
-    paddingHorizontal: 20, 
-    paddingBottom: 100 
-  },
-  loadingContainer: { 
-    flex: 1, 
-    alignItems: 'center', 
-    justifyContent: 'center' 
-  },
-  loadingText: { 
-    fontSize: 10, 
-    letterSpacing: 2, 
-    color: THEME.textMuted 
-  },
-
-  // Event Item & Timeline
-  eventItem: {
-    flexDirection: 'row',
-    position: 'relative',
-    paddingLeft: 28,
-    marginBottom: 32,
-  },
-  line: {
-    position: 'absolute',
-    left: 7,
-    top: 5,
-    bottom: -32,
-    width: 2,
-    backgroundColor: THEME.border,
-    zIndex: 0,
-  },
-  dot: {
-    width: 16,
-    height: 16,
-    borderWidth: 3,
-    borderColor: THEME.accent,
-    backgroundColor: THEME.bg,
-    borderRadius: 8,
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    zIndex: 2,
-  },
-  dateLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: THEME.accent,
-    marginBottom: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-
-  // Event Card
-  card: {
-    backgroundColor: THEME.cardBg,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: THEME.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  cardTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: THEME.text,
-    flex: 1,
-    marginRight: 8,
-    lineHeight: 22,
-  },
-  cardMiddle: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-  cardDetails: {
-    flex: 1,
-    justifyContent: 'center',
-    gap: 6,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  infoText: {
-    fontSize: 13,
-    color: THEME.textMuted,
-    flex: 1,
-  },
-  categoryBadge: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: THEME.accent,
-  },
-  eventImg: {
-    width: 64,
-    height: 64,
-    borderRadius: 10,
-    backgroundColor: THEME.surface,
-  },
-  cardBottom: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: THEME.border,
-  },
-  priceText: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: THEME.text,
-  },
-  priceFree: {
-    color: '#27ae60',
-  },
-  actionBtn: {
-    backgroundColor: THEME.accent,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    shadowColor: THEME.accent,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  actionBtnText: {
-    color: '#000',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-
-  // Categories
-  actionBar: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-  iconButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: THEME.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: THEME.cardBg,
-  },
-  badge: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  badgeText: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: '#000000',
-  },
-  catSelectorContainer: {
-    marginBottom: 4,
-  },
-  pillContainer: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 25,
-    borderWidth: 1,
-  },
-  pillActive: {
-    backgroundColor: THEME.accent,
-    borderColor: THEME.accent,
-  },
-  pillInactive: {
-    backgroundColor: THEME.cardBg,
-    borderColor: THEME.border,
-  },
-  pillText: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 1,
-  },
-
-  // Search
-  searchContainer: {
-    marginBottom: 16,
-  },
+  hdrIconBtnActive: { backgroundColor: THEME.colors.accentMuted, borderColor: THEME.colors.accentBorder },
+  badge: { position: 'absolute', top: 5, right: 5, minWidth: 16, height: 16, borderRadius: 8, backgroundColor: THEME.colors.accent, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3 },
+  badgeTxt: { fontSize: 9, fontWeight: '900', color: '#000' },
   searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: THEME.cardBg,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: THEME.borderLight,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: THEME.colors.surface,
+    borderRadius: 14, paddingHorizontal: 14, height: 48, marginBottom: 14,
+    borderWidth: 1, borderColor: THEME.colors.borderLight,
   },
-  searchInput: {
-    flex: 1,
-    height: 48,
-    color: THEME.text,
-    fontSize: 14,
-    marginLeft: 10,
-    fontWeight: '600',
+  searchInput: { flex: 1, marginLeft: 10, color: THEME.colors.text, fontSize: 15, fontWeight: '500' },
+  catList: { marginBottom: 18, marginTop: 10 },
+  pill: {
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: 12, backgroundColor: 'transparent', marginRight: 8,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', gap: 6,
   },
-
-  // Modal
-  modalContainer: { 
-    flex: 1, 
-    backgroundColor: THEME.bg 
+  pillActive: { backgroundColor: 'rgba(255,107,0,0.12)', borderColor: 'rgba(255,107,0,0.4)' },
+  pillText: { fontSize: 11, fontWeight: '500', color: '#A0A0A0', letterSpacing: 0.8 },
+  pillTextActive: { color: THEME.colors.accent },
+  resultsBar: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
+  resultsLine: { flex: 1, height: 1, backgroundColor: THEME.colors.border },
+  resultsText: { fontSize: 10, fontWeight: '700', color: THEME.colors.textMuted, letterSpacing: 1.8 },
+  listContent: { paddingHorizontal: 16, paddingBottom: 100 },
+  listHeader: { paddingTop: 12, marginBottom: 14 },
+  cardWrapper: { marginBottom: 20 },
+  card: {
+    backgroundColor: THEME.colors.cardBg, borderRadius: 18, overflow: 'hidden',
+    borderWidth: 1, borderColor: THEME.colors.border,
+    shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 40, shadowOffset: { width: 0, height: 10 }, elevation: 14,
   },
-  modalHeader: {
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center',
-    padding: 20, 
-    borderBottomWidth: 1, 
-    borderBottomColor: THEME.border,
+  cardRimLight: {
+    ...StyleSheet.absoluteFillObject,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 18,
   },
-  modalTitle: { 
-    fontSize: 18, 
-    fontWeight: '800', 
-    color: THEME.accent,
-    letterSpacing: 1,
+  cardBody: { flexDirection: 'row', padding: 20, gap: 16 },
+  dateCol: { alignItems: 'center', width: 45, paddingTop: 4 },
+  dateDay: { fontSize: 22, fontWeight: '600', color: THEME.colors.accent, lineHeight: 22 },
+  dateMonth: { fontSize: 11, fontWeight: '400', color: THEME.colors.text, letterSpacing: 1, marginTop: 2 },
+  dateDivider: { width: 12, height: 1.5, backgroundColor: THEME.colors.accent, marginVertical: 6, opacity: 0.5 },
+  dateWeekday: { fontSize: 10, fontWeight: '400', color: THEME.colors.textMuted, letterSpacing: 1 },
+  verticalDivider: { width: 1, backgroundColor: THEME.colors.border, marginVertical: 10, opacity: 0.1 },
+  contentCol: { flex: 1, gap: 10 },
+  titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  cardTitle: { fontSize: 17, fontWeight: '600', color: THEME.colors.text, flex: 1, lineHeight: 24 },
+  bookmarkBtn: {
+    width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
-  closeButton: {
-    width: 40, 
-    height: 40, 
-    borderRadius: 12, 
-    backgroundColor: THEME.cardBg,
-    borderWidth: 1, 
-    borderColor: THEME.border, 
-    alignItems: 'center', 
-    justifyContent: 'center',
+  eventMetaBlock: { gap: 2, paddingRight: 8 },
+  eventMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  eventMetaText: { flex: 1, fontSize: 13, color: '#9A9A9A', fontWeight: '400' },
+  eventMetaSubText: { marginLeft: 19, fontSize: 12, color: THEME.colors.textMuted, fontWeight: '400' },
+  cardFooter: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingTop: 6, marginTop: 4,
   },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline' },
+  priceSymbol: { fontSize: 13, fontWeight: '400', color: '#9A9A9A', marginRight: 1 },
+  priceValue: { fontSize: 22, fontWeight: '400', color: THEME.colors.text, letterSpacing: 0.5 },
+  freePill: {
+    backgroundColor: 'rgba(46,204,113,0.12)', paddingHorizontal: 12, paddingVertical: 4,
+    borderRadius: 8, borderWidth: 1, borderColor: 'rgba(46,204,113,0.4)',
+  },
+  freeText: { fontSize: 11, fontWeight: '500', color: '#2ecc71', letterSpacing: 1 },
+  registerBtn: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 16, paddingVertical: 7, borderRadius: 10, gap: 4,
+    overflow: 'hidden',
+    shadowColor: '#FF6B00',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  registerBtnHighlight: {
+    position: 'absolute', top: 0, left: 0, right: 0, height: '40%',
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  registerBtnText: { color: '#000', fontSize: 12, fontWeight: '500', letterSpacing: 0.3 },
+  emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 60, gap: 10 },
+  emptyIcon: {
+    width: 84, height: 84, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.04)',
+    alignItems: 'center', justifyContent: 'center', marginBottom: 8,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)',
+  },
+  emptyTitle: { fontSize: 17, fontWeight: '600', color: THEME.colors.text, letterSpacing: 0.5 },
+  emptySubtitle: { fontSize: 13, color: THEME.colors.textMuted, fontWeight: '400' },
+  modalContainer: { flex: 1, backgroundColor: THEME.colors.bg },
+  modalHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: THEME.colors.borderLight, alignSelf: 'center', marginTop: 24, marginBottom: 10 },
+  modalTitle: { fontSize: 20, fontWeight: '600', color: THEME.colors.text, letterSpacing: 0.5 },
+  modalSubtitle: { fontSize: 10, color: THEME.colors.accent, fontWeight: '800', letterSpacing: 1 },
+  modalList: { padding: 16, paddingBottom: 40 },
 });

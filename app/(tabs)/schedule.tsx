@@ -5,7 +5,6 @@ import {
   View,
   Pressable,
   FlatList,
-  TouchableOpacity,
   Image,
   ImageBackground,
 } from 'react-native';
@@ -23,7 +22,7 @@ import Animated, {
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Defs, LinearGradient as SvgGradient, Stop, Path } from 'react-native-svg';
-import { useRouter } from 'expo-router';
+import { VergeHeader } from '../../src/components/VergeHeader';
 
 // --- THEME ---
 const THEME = {
@@ -82,7 +81,6 @@ Object.values(EVENTS_BY_DAY).forEach((events) => {
 });
 
 export default function ScheduleScreen() {
-  const router = useRouter();
   const [selectedDay, setSelectedDay] = useState(1);
 
   const filteredEvents = useMemo(() => EVENTS_BY_DAY[selectedDay] || [], [selectedDay]);
@@ -111,16 +109,15 @@ export default function ScheduleScreen() {
 
   const panGesture = Gesture.Pan()
     .onUpdate((e) => {
+      'worklet';
       const clampedX = Math.max(-MAX_SLIDE, Math.min(MAX_SLIDE, e.translationX));
       translateX.value = clampedX;
 
-      // Keep directional preview glow while dragging before a switch is triggered.
       if (!hasChanged.value) {
         let nextGlowSide: 0 | -1 | 1 = 0;
         if (clampedX <= -GLOW_TRIGGER) nextGlowSide = -1;
         if (clampedX >= GLOW_TRIGGER) nextGlowSide = 1;
 
-        // Avoid spawning timing animations on every frame.
         if (nextGlowSide !== glowSide.value) {
           glowSide.value = nextGlowSide;
           if (nextGlowSide === -1) {
@@ -135,7 +132,6 @@ export default function ScheduleScreen() {
           }
         }
 
-        // Once day actually switches, force the glow to full on that side.
         if (e.translationX > TRIGGER_THRESHOLD) {
           rightGlowOpacity.value = 1;
           leftGlowOpacity.value = 0;
@@ -152,6 +148,7 @@ export default function ScheduleScreen() {
       }
     })
     .onFinalize(() => {
+      'worklet';
       translateX.value = withSpring(0, { damping: 15 });
       leftGlowOpacity.value = withTiming(0, { duration: 1000 });
       rightGlowOpacity.value = withTiming(0, { duration: 1000 });
@@ -159,24 +156,28 @@ export default function ScheduleScreen() {
       hasChanged.value = false;
     });
 
-  const animatedMoonStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-  }));
+  const animatedMoonStyle = useAnimatedStyle(() => {
+    'worklet';
+    return { transform: [{ translateX: translateX.value }] };
+  });
 
-  const animatedLeftGlowStyle = useAnimatedStyle(() => ({
-    opacity: leftGlowOpacity.value,
-  }));
+  const animatedLeftGlowStyle = useAnimatedStyle(() => {
+    'worklet';
+    return { opacity: leftGlowOpacity.value };
+  });
 
-  const animatedRightGlowStyle = useAnimatedStyle(() => ({
-    opacity: rightGlowOpacity.value,
-  }));
+  const animatedRightGlowStyle = useAnimatedStyle(() => {
+    'worklet';
+    return { opacity: rightGlowOpacity.value };
+  });
 
   const renderTimelineItem = useCallback(({ item, index }: { item: Event; index: number }) => {
     return (
       <Animated.View 
-        entering={FadeInUp.delay(index * 100).springify()} 
+        entering={FadeInUp.delay(index * 30).springify()} 
         layout={Layout.springify()}
         style={styles.eventContainer}
+        renderToHardwareTextureAndroid={true}
       >
         {/* Accent Dot */}
         <View style={[styles.eventDot, { backgroundColor: THEME.accent, shadowColor: THEME.accent }]} />
@@ -198,6 +199,8 @@ export default function ScheduleScreen() {
     );
   }, []);
 
+  const keyExtractor = useCallback((item: Event) => item.id, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView edges={['top']} style={styles.container}>
@@ -206,17 +209,7 @@ export default function ScheduleScreen() {
           style={StyleSheet.absoluteFill}
         />
 
-        {/* Keeping the new Header */}
-        <View style={styles.header}>
-          <View style={styles.headerRow}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.minimalBack}>
-              <Ionicons name="chevron-back" size={22} color={THEME.text} />
-            </TouchableOpacity>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={styles.headerTitle}>SCHEDULE</Text>
-            </View>
-          </View>
-        </View>
+        <VergeHeader title="SCHEDULE" />
 
         <View style={styles.tabsContainer}>
           {[1, 2, 3].map((day) => (
@@ -264,9 +257,13 @@ export default function ScheduleScreen() {
           <FlatList
             data={filteredEvents}
             renderItem={renderTimelineItem}
-            keyExtractor={item => item.id}
+            keyExtractor={keyExtractor}
             contentContainerStyle={{ paddingVertical: 30 }}
             showsVerticalScrollIndicator={false}
+            initialNumToRender={8}
+            maxToRenderPerBatch={5}
+            windowSize={5}
+            removeClippedSubviews={true}
             ListEmptyComponent={
               <View style={{ marginTop: 40, paddingLeft: 60 }}>
                 <Text style={{ color: THEME.textMuted }}>No mission data for Day {selectedDay}</Text>
@@ -297,7 +294,9 @@ export default function ScheduleScreen() {
               />
             </View>
             <GestureDetector gesture={panGesture}>
-              <Animated.View style={[styles.moonJoystick, animatedMoonStyle]}>
+              <Animated.View 
+                style={[styles.moonJoystick, animatedMoonStyle]}
+              >
                 <View style={styles.moonInner}>
                   <Image
                     source={require('../../assets/moon.png')}
@@ -307,7 +306,7 @@ export default function ScheduleScreen() {
                   <View style={styles.moonVignette} />
                 </View>
                 <Animated.View pointerEvents="none" style={[styles.moonArcOverlay, animatedLeftGlowStyle]}>
-                  <Svg width="100%" height="100%" viewBox="0 0 100 100">
+                  <Svg width="100%" height="100%" viewBox="-20 -20 140 140">
                     <Defs>
                       <SvgGradient id="moonLeftArcGlow" x1="50%" y1="0%" x2="50%" y2="100%">
                         <Stop offset="0%" stopColor="#FF9B2A" stopOpacity="0" />
@@ -364,7 +363,7 @@ export default function ScheduleScreen() {
                   </Svg>
                 </Animated.View>
                 <Animated.View pointerEvents="none" style={[styles.moonArcOverlay, animatedRightGlowStyle]}>
-                  <Svg width="100%" height="100%" viewBox="0 0 100 100">
+                  <Svg width="100%" height="100%" viewBox="-20 -20 140 140">
                     <Defs>
                       <SvgGradient id="moonRightArcGlow" x1="50%" y1="0%" x2="50%" y2="100%">
                         <Stop offset="0%" stopColor="#FF9B2A" stopOpacity="0" />
@@ -529,13 +528,14 @@ const styles = StyleSheet.create({
   eventTitle: { fontSize: 16, color: THEME.text, fontWeight: '400', lineHeight: 22 },
   eventLocation: { fontSize: 11, color: THEME.textMuted, marginLeft: 4 },
 
-  navControl: { height: 140, justifyContent: 'center', alignItems: 'center' },
+  navControl: { height: 160, justifyContent: 'center', alignItems: 'center' },
   joystickBase: {
-    width: 160,
-    height: 130,
+    width: 220,
+    height: 150,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
+    overflow: 'visible',
   },
   joystickHint: {
     position: 'absolute',
@@ -544,12 +544,12 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   joystickHintLeft: {
-    left: 10,
-    top: 56,
+    left: 20,
+    top: 66,
   },
   joystickHintRight: {
-    right: 10,
-    top: 56,
+    right: 20,
+    top: 66,
   },
   moonJoystick: {
     width: 90,
@@ -557,10 +557,6 @@ const styles = StyleSheet.create({
     borderRadius: 45,
     overflow: 'visible',
     backgroundColor: 'transparent',
-    shadowColor: '#ff3d2f',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
   },
   moonInner: {
     ...StyleSheet.absoluteFillObject,
@@ -570,10 +566,10 @@ const styles = StyleSheet.create({
   },
   moonArcOverlay: {
     position: 'absolute',
-    top: -6,
-    left: -6,
-    width: 102,
-    height: 102,
+    top: -20,
+    left: -20,
+    right: -20,
+    bottom: -20,
     zIndex: 3,
   },
   moonImage: {

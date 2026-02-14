@@ -4,12 +4,12 @@ import {
   View,
   Image,
   Pressable,
-  ActivityIndicator,
   TextInput,
   StyleSheet,
   Dimensions,
   PanResponder,
   FlatList,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,25 +26,18 @@ import Animated, {
   Extrapolation,
   useAnimatedScrollHandler,
   withTiming,
-  Layout,
+  runOnJS,
 } from 'react-native-reanimated';
 
 import { useCart } from '../../src/context/CartContext';
+import { THEME } from '../../src/constants/Theme';
+import { VergeHeader } from '../../src/components/VergeHeader';
+import { VergeLoader } from '../../src/components/VergeLoader';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const MERCH_BG_ASSET = Image.resolveAssetSource(require('../../assets/merch-bg.jpeg'));
 const MERCH_BG_RATIO = MERCH_BG_ASSET.width / MERCH_BG_ASSET.height;
 
-const THEME = {
-  bg: '#050505',
-  cardBg: '#121212',
-  accent: '#FF6B00',
-  text: '#FFFFFF',
-  textMuted: '#888888',
-  border: '#1F1F1F',
-};
-
-// Layout Constants - Tuned for adjacent visibility + subtle fan rotation
 const CARD_WIDTH = SCREEN_WIDTH * 0.6;
 const CARD_HEIGHT = 350;
 const CARD_SPACING = 5;
@@ -62,49 +55,27 @@ const CATEGORY_ICONS: Record<string, any> = {
 // ── Carousel Card ──────────────────────────────────────────────────
 const CarouselCard = memo(({ item, index, scrollX, onPress }: any) => {
   const animatedStyle = useAnimatedStyle(() => {
+    'worklet';
     const input = [
       (index - 1) * CARD_TOTAL,
       index * CARD_TOTAL,
       (index + 1) * CARD_TOTAL,
     ];
 
-    // 1. Rotation Logic (Rotate around the bottom)
-    // Left card tilts right (positive), Right card tilts left (negative)
-    const rotation = interpolate(
-      scrollX.value,
-      input,
-      [8, 0, -8], // Reduced from 10 for flatter, more visible cards
-      Extrapolation.CLAMP
-    );
-
-    // 2. The "Arc" Height
-    // Side cards sit lower than the center card to form a circle
-    const translateY = interpolate(
-      scrollX.value,
-      input,
-      [40, 0, 40],
-      Extrapolation.CLAMP
-    );
-
-    // 3. Horizontal Squeeze
-    const translateX = interpolate(
-      scrollX.value,
-      input,
-      [-10, 0, 10],
-      Extrapolation.CLAMP
-    );
-
+    const rotation = interpolate(scrollX.value, input, [8, 0, -8], Extrapolation.CLAMP);
+    const translateY = interpolate(scrollX.value, input, [40, 0, 40], Extrapolation.CLAMP);
+    const translateX = interpolate(scrollX.value, input, [-10, 0, 10], Extrapolation.CLAMP);
     const scale = interpolate(scrollX.value, input, [0.88, 1, 0.88], Extrapolation.CLAMP);
 
     return {
       transform: [
         { perspective: 1000 },
-        { translateY: CARD_HEIGHT / 2 }, // Move "hinge" to center
-        { rotateZ: `${rotation}deg` },   // Rotate on the Z plane (the fan)
-        { rotateY: `${rotation * -1.5}deg` }, // 3D tilt inwards
-        { translateY: -CARD_HEIGHT / 2 }, // Move back up
-        { translateY }, // Apply the arc offset
-        { translateX }, // Apply the horizontal squeeze
+        { translateY: CARD_HEIGHT / 2 },
+        { rotateZ: `${rotation}deg` },
+        { rotateY: `${rotation * -1.5}deg` },
+        { translateY: -CARD_HEIGHT / 2 },
+        { translateY },
+        { translateX },
         { scale },
       ],
       zIndex: interpolate(scrollX.value, input, [1, 10, 1], Extrapolation.CLAMP),
@@ -113,7 +84,7 @@ const CarouselCard = memo(({ item, index, scrollX, onPress }: any) => {
   });
 
   return (
-    <Animated.View style={[styles.carouselCard, animatedStyle]}>
+    <Animated.View style={[styles.carouselCard, animatedStyle]} renderToHardwareTextureAndroid={true}>
       <Pressable onPress={() => onPress(item._id)} style={styles.cardPressable}>
         <View style={styles.cardContainer}>
           <Image
@@ -136,17 +107,16 @@ const CarouselCard = memo(({ item, index, scrollX, onPress }: any) => {
   );
 });
 
-// ── Fixed Point-to-Select Joystick ──────────────────────────────
+// ── Joystick ──────────────────────────────
 const ARC_RADIUS = 160;
 const ITEM_SIZE = 50;
 const TAP_MAX_DISTANCE = 14;
 const TAP_MAX_DURATION_MS = 450;
-const ARC_ALIGNMENT_OFFSET_DEG = 10;
 const HOLD_DEAD_ZONE = 26;
 const HOLD_MAX_ANGLE_DIFF = 32;
 const HOLD_SWITCH_BUFFER_DEG = 6;
 
-const JoystickButton = ({ activeCategory, onSelect, onHoldChange }: any) => {
+const JoystickButton = memo(({ activeCategory, onSelect, onHoldChange }: any) => {
   const [isHolding, setIsHolding] = useState(false);
   const [isPinnedOpen, setIsPinnedOpen] = useState(false);
   const [activeHover, setActiveHover] = useState<string | null>(null);
@@ -163,15 +133,18 @@ const JoystickButton = ({ activeCategory, onSelect, onHoldChange }: any) => {
 
   useEffect(() => {
     holdProgress.value = withTiming(isHolding ? 1 : 0, { duration: isHolding ? 260 : 140 });
-  }, [isHolding, holdProgress]);
+  }, [isHolding]);
 
-  const holdArcStyle = useAnimatedStyle(() => ({
-    opacity: arcOpacity.value,
-    transform: [
-      { rotate: `${180 - arcAngle.value + ARC_ALIGNMENT_OFFSET_DEG}deg` },
-      { scale: interpolate(holdProgress.value, [0, 1], [0.9, 1], Extrapolation.CLAMP) },
-    ],
-  }));
+  const holdArcStyle = useAnimatedStyle(() => {
+    'worklet';
+    return {
+      opacity: arcOpacity.value,
+      transform: [
+        { rotate: `${180 - arcAngle.value + 10}deg` },
+        { scale: interpolate(holdProgress.value, [0, 1], [0.9, 1], Extrapolation.CLAMP) },
+      ],
+    };
+  });
 
   const menuPositions = useMemo(() => {
     return CATEGORIES.map((cat, i) => {
@@ -200,7 +173,7 @@ const JoystickButton = ({ activeCategory, onSelect, onHoldChange }: any) => {
     } else {
       arcOpacity.value = withTiming(0, { duration: 110 });
     }
-  }, [activeCategory, activeHover, arcAngle, arcOpacity, getCategoryAngle, isHolding]);
+  }, [activeCategory, activeHover, isHolding, getCategoryAngle]);
 
   const handleItemTap = useCallback((category: string) => {
     onSelect(category);
@@ -232,24 +205,20 @@ const JoystickButton = ({ activeCategory, onSelect, onHoldChange }: any) => {
           }
         });
 
-        if (minDiff > HOLD_MAX_ANGLE_DIFF) {
-          closest = null;
-        }
+        if (minDiff > HOLD_MAX_ANGLE_DIFF) closest = null;
 
         if (closest && hoverRef.current && closest !== hoverRef.current) {
           const currentPos = menuPositions.find((pos) => pos.cat === hoverRef.current);
           if (currentPos) {
             const currentAngle = Math.atan2(-currentPos.y, currentPos.x) * (180 / Math.PI);
             const currentDiff = getAngleDiff(angleDeg, currentAngle);
-            if (currentDiff <= minDiff + HOLD_SWITCH_BUFFER_DEG) {
-              closest = hoverRef.current;
-            }
+            if (currentDiff <= minDiff + HOLD_SWITCH_BUFFER_DEG) closest = hoverRef.current;
           }
         }
       }
       if (hoverRef.current !== closest) {
         hoverRef.current = closest;
-        setActiveHover(closest);
+        runOnJS(setActiveHover)(closest);
       }
     },
     onPanResponderRelease: (_, g) => {
@@ -257,18 +226,16 @@ const JoystickButton = ({ activeCategory, onSelect, onHoldChange }: any) => {
       const pressDuration = Date.now() - touchStartRef.current;
       const isTap = gestureDist < TAP_MAX_DISTANCE && pressDuration < TAP_MAX_DURATION_MS;
 
-      if (hoverRef.current) onSelect(hoverRef.current);
-      if (isTap && !hoverRef.current) {
-        setIsPinnedOpen((prev) => !prev);
-      }
+      if (hoverRef.current) runOnJS(onSelect)(hoverRef.current);
+      if (isTap && !hoverRef.current) runOnJS(setIsPinnedOpen)(prev => !prev);
 
-      setIsHolding(false);
-      setActiveHover(null);
+      runOnJS(setIsHolding)(false);
+      runOnJS(setActiveHover)(null);
       hoverRef.current = null;
     },
     onPanResponderTerminate: () => {
-      setIsHolding(false);
-      setActiveHover(null);
+      runOnJS(setIsHolding)(false);
+      runOnJS(setActiveHover)(null);
       hoverRef.current = null;
     }
   }), [getAngleDiff, menuPositions, onSelect]);
@@ -282,22 +249,24 @@ const JoystickButton = ({ activeCategory, onSelect, onHoldChange }: any) => {
               key={pos.cat}
               entering={FadeIn.duration(180).delay(index * 24)}
               exiting={FadeOut.duration(130)}
-              style={[styles.menuItem, { transform: [{ translateX: pos.x }, { translateY: pos.y }] }]}
+              style={styles.menuItem}
             >
-              <Pressable
-                onPress={() => handleItemTap(pos.cat)}
-                disabled={!isPinnedOpen || isHolding}
-                style={styles.menuItemPressable}
-              >
-                <BlurView intensity={25} tint="dark" style={[
-                  styles.itemCircle,
-                  activeHover === pos.cat && styles.itemCircleActive,
-                  activeCategory === pos.cat && !activeHover && styles.activeIndicator
-                ]}>
-                  <Ionicons name={CATEGORY_ICONS[pos.cat]} size={22} color={activeHover === pos.cat ? '#000' : '#FFF'} />
-                </BlurView>
-                <Text style={styles.itemLabel}>{pos.cat.toUpperCase()}</Text>
-              </Pressable>
+              <View style={{ transform: [{ translateX: pos.x }, { translateY: pos.y }] }}>
+                <Pressable
+                  onPress={() => handleItemTap(pos.cat)}
+                  disabled={!isPinnedOpen || isHolding}
+                  style={styles.menuItemPressable}
+                >
+                  <BlurView intensity={25} tint="dark" style={[
+                    styles.itemCircle,
+                    activeHover === pos.cat && styles.itemCircleActive,
+                    activeCategory === pos.cat && !activeHover && styles.activeIndicator
+                  ]}>
+                    <Ionicons name={CATEGORY_ICONS[pos.cat]} size={22} color={activeHover === pos.cat ? '#000' : '#FFF'} />
+                  </BlurView>
+                  <Text style={styles.itemLabel}>{pos.cat.toUpperCase()}</Text>
+                </Pressable>
+              </View>
             </Animated.View>
           ))}
         </View>
@@ -341,9 +310,9 @@ const JoystickButton = ({ activeCategory, onSelect, onHoldChange }: any) => {
       <Text style={styles.orbHint}>Explore</Text>
     </View>
   );
-};
+});
 
-// ── Main Merch Screen ──────────────────────────────────────────────
+// ── Main Merch Screen ──
 export default function Merch() {
   const router = useRouter();
   const { cart } = useCart();
@@ -357,12 +326,13 @@ export default function Merch() {
   const scrollX = useSharedValue(0);
   const overlayProgress = useSharedValue(0);
   const scrollHandler = useAnimatedScrollHandler({
-    onScroll: (e) => { scrollX.value = e.contentOffset.x; },
+    onScroll: (e) => { 'worklet'; scrollX.value = e.contentOffset.x; },
   });
 
-  const overlayAnimatedStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(overlayProgress.value, [0, 1], [0, 1], Extrapolation.CLAMP),
-  }));
+  const overlayAnimatedStyle = useAnimatedStyle(() => {
+    'worklet';
+    return { opacity: overlayProgress.value };
+  });
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -373,7 +343,7 @@ export default function Merch() {
 
   useEffect(() => {
     overlayProgress.value = withTiming(isJoystickHeld ? 1 : 0, { duration: 260 });
-  }, [isJoystickHeld, overlayProgress]);
+  }, [isJoystickHeld]);
 
   useEffect(() => {
     (async () => {
@@ -390,6 +360,21 @@ export default function Merch() {
     p.title.toLowerCase().includes(searchQuery.toLowerCase())
   ), [products, activeTab, searchQuery]);
 
+  const handleProductPress = useCallback((id: string) => {
+    router.push(`MerchStore/${id}` as any);
+  }, [router]);
+
+  const renderItem = useCallback(({ item, index }: any) => (
+    <CarouselCard
+      item={item}
+      index={index}
+      scrollX={scrollX}
+      onPress={handleProductPress}
+    />
+  ), [handleProductPress]);
+
+  const keyExtractor = useCallback((item: any) => item._id, []);
+
   return (
     <View style={styles.container}>
       <Image
@@ -400,34 +385,30 @@ export default function Merch() {
       <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.6)' }]} />
 
       <SafeAreaView edges={['top']} style={{ flex: 1 }}>
-        <View style={styles.header}>
-          <View style={styles.headerRow}>
-            <Pressable onPress={() => router.back()} style={styles.backBtn}>
-              <Ionicons name="chevron-back" size={24} color={THEME.text} />
-            </Pressable>
-            <View style={{ flex: 1, marginLeft: 12 }}>
-              <Text style={styles.headerTitle}>STORE</Text>
-            </View>
+        <VergeHeader 
+          title="STORE" 
+          rightElement={
             <View style={styles.headerActions}>
               <Pressable onPress={() => router.push('MerchStore/orders' as any)} style={styles.iconBtn}>
-                <Ionicons name="receipt-outline" size={20} color={THEME.textMuted} />
+                <Ionicons name="receipt-outline" size={20} color={THEME.colors.textMuted} />
               </Pressable>
               <Pressable onPress={() => router.push('MerchStore/cart' as any)} style={[styles.iconBtn, cart?.length > 0 && styles.iconBtnActive]}>
-                <Ionicons name={cart?.length > 0 ? 'bag-handle' : 'bag-handle-outline'} size={20} color={cart?.length > 0 ? THEME.accent : THEME.textMuted} />
+                <Ionicons name={cart?.length > 0 ? 'bag-handle' : 'bag-handle-outline'} size={20} color={cart?.length > 0 ? THEME.colors.accent : THEME.colors.textMuted} />
                 {cart?.length > 0 && <View style={styles.badge}><Text style={styles.badgeTxt}>{cart.length}</Text></View>}
               </Pressable>
             </View>
-          </View>
-        </View>
+          }
+        />
 
         <View style={styles.searchBar}>
-          <Ionicons name="search" size={18} color={THEME.textMuted} />
+          <Ionicons name="search" size={18} color={THEME.colors.textMuted} />
           <TextInput
             placeholder="SEARCH PRODUCTS..."
-            placeholderTextColor={THEME.textMuted}
+            placeholderTextColor={THEME.colors.textMuted}
             style={styles.searchInput}
             value={searchQuery}
             onChangeText={setSearchQuery}
+            removeClippedSubviews={Platform.OS === 'android'}
           />
         </View>
 
@@ -436,11 +417,9 @@ export default function Merch() {
             horizontal
             data={CATEGORIES}
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 20 }}
-            snapToAlignment="start"
-            snapToInterval={116}
-            decelerationRate="fast"
-            disableIntervalMomentum
+            contentContainerStyle={styles.catList}
+            removeClippedSubviews={true}
+            keyExtractor={(item) => item}
             renderItem={({ item }) => (
               <Pressable
                 onPress={() => setActiveTab(item)}
@@ -449,7 +428,7 @@ export default function Merch() {
                 <Ionicons
                   name={CATEGORY_ICONS[item]}
                   size={14}
-                  color={activeTab === item ? '#000' : '#D6D6D6'}
+                  color={activeTab === item ? THEME.colors.accent : '#A0A0A0'}
                 />
                 <Text style={[styles.pillText, activeTab === item && styles.pillTextActive]}>
                   {item.toUpperCase()}
@@ -460,7 +439,7 @@ export default function Merch() {
         </View>
 
         {loading ? (
-          <View style={styles.center}><ActivityIndicator color={THEME.accent} /></View>
+          <VergeLoader message="RESTOCKING" />
         ) : (
           <View style={styles.carouselWrapper}>
             <Animated.FlatList
@@ -475,14 +454,12 @@ export default function Merch() {
               disableIntervalMomentum
               onScroll={scrollHandler}
               scrollEventThrottle={16}
-              renderItem={({ item, index }) => (
-                <CarouselCard
-                  item={item}
-                  index={index}
-                  scrollX={scrollX}
-                  onPress={(id: any) => router.push(`MerchStore/${id}`)}
-                />
-              )}
+              initialNumToRender={3}
+              maxToRenderPerBatch={2}
+              windowSize={3}
+              removeClippedSubviews={true}
+              renderItem={renderItem}
+              keyExtractor={keyExtractor}
               ListEmptyComponent={<View style={styles.empty}><Text style={styles.emptyText}>NO ITEMS FOUND</Text></View>}
             />
           </View>
@@ -507,7 +484,7 @@ export default function Merch() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: THEME.bg },
+  container: { flex: 1, backgroundColor: THEME.colors.bg },
   merchBgImage: {
     position: 'absolute',
     top: 0,
@@ -515,31 +492,23 @@ const styles = StyleSheet.create({
     width: SCREEN_HEIGHT * MERCH_BG_RATIO,
     left: (SCREEN_WIDTH - SCREEN_HEIGHT * MERCH_BG_RATIO) / 2,
   },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-
-  // Header
-  header: { paddingHorizontal: 20, paddingBottom: 15 },
-  headerRow: { flexDirection: 'row', alignItems: 'center' },
-  backBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontSize: 20, fontFamily: 'Guardians', color: THEME.text, letterSpacing: 0.5 },
   headerActions: { flexDirection: 'row', gap: 10 },
-  iconBtn: { width: 44, height: 44, borderRadius: 14, borderWidth: 1, borderColor: THEME.border, alignItems: 'center', justifyContent: 'center', backgroundColor: '#121212' },
-  iconBtnActive: { borderColor: THEME.accent },
-  badge: { position: 'absolute', top: -5, right: -5, width: 18, height: 18, borderRadius: 9, backgroundColor: THEME.accent, alignItems: 'center', justifyContent: 'center' },
+  iconBtn: { width: 44, height: 44, borderRadius: 14, borderWidth: 1, borderColor: THEME.colors.border, alignItems: 'center', justifyContent: 'center', backgroundColor: '#121212' },
+  iconBtnActive: { borderColor: THEME.colors.accent },
+  badge: { position: 'absolute', top: -5, right: -5, width: 18, height: 18, borderRadius: 9, backgroundColor: THEME.colors.accent, alignItems: 'center', justifyContent: 'center' },
   badgeTxt: { fontSize: 10, fontWeight: '900', color: '#000' },
-
-  // Search
-  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#111', marginHorizontal: 20, borderRadius: 15, paddingHorizontal: 16, height: 54, marginBottom: 10, borderWidth: 1, borderColor: THEME.border },
+  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#111', marginHorizontal: 20, borderRadius: 15, paddingHorizontal: 16, height: 54, marginBottom: 10, borderWidth: 1, borderColor: THEME.colors.border },
   searchInput: { flex: 1, marginLeft: 12, color: '#FFF', fontWeight: '600', letterSpacing: 0.5 },
-
-  // Category Tabs
   categoryTabs: { marginBottom: 15 },
-  pill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', minWidth: 104, paddingHorizontal: 16, paddingVertical: 9, borderRadius: 20, backgroundColor: '#1A1A1A', marginRight: 8, borderWidth: 1, borderColor: 'rgba(255,255,255,0.22)', gap: 6 },
-  pillActive: { backgroundColor: THEME.accent, borderColor: THEME.accent },
-  pillText: { fontSize: 10, fontWeight: '800', color: '#D6D6D6', letterSpacing: 1 },
-  pillTextActive: { color: '#000' },
-
-  // Carousel Layout - Shifted lower
+  catList: { paddingHorizontal: 20, marginTop: 2, marginBottom: 6 },
+  pill: {
+    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 8,
+    borderRadius: 12, backgroundColor: 'transparent', marginRight: 8,
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', gap: 6,
+  },
+  pillActive: { backgroundColor: 'rgba(255,107,0,0.12)', borderColor: 'rgba(255,107,0,0.4)' },
+  pillText: { fontSize: 11, fontWeight: '500', color: '#A0A0A0', letterSpacing: 0.8 },
+  pillTextActive: { color: THEME.colors.accent },
   carouselWrapper: { flex: 1, paddingTop: 50, paddingBottom: 140 },
   carouselCard: { width: CARD_WIDTH, marginHorizontal: CARD_SPACING / 2, height: CARD_HEIGHT },
   cardPressable: { flex: 1 },
@@ -560,42 +529,23 @@ const styles = StyleSheet.create({
   cardOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: '60%', justifyContent: 'flex-end', padding: 20 },
   cardContent: { gap: 2 },
   cardTitle: { color: '#FFF', fontSize: 18, fontWeight: '700', letterSpacing: -0.5 },
-  cardPriceTypography: { color: THEME.accent, fontSize: 16, fontWeight: '900', textAlign: 'left' },
-
-  joystickBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    zIndex: 15,
-  },
-  joystickLayer: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 20,
-  },
-
-  // Joystick
+  cardPriceTypography: { color: THEME.colors.accent, fontSize: 16, fontWeight: '900', textAlign: 'left' },
+  joystickBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0, 0, 0, 0.5)', zIndex: 15 },
+  joystickLayer: { ...StyleSheet.absoluteFillObject, zIndex: 20 },
   joystickWrapper: { position: 'absolute', bottom: 20, alignSelf: 'center', alignItems: 'center' },
-  centerCloseIconWrap: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  centerCloseIconWrap: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center' },
   mainOrb: { width: 120, height: 120, borderRadius: 60, overflow: 'visible', bottom: -15 },
   orbActive: { transform: [{ scale: 0.94 }] },
   orbContent: { ...StyleSheet.absoluteFillObject, borderRadius: 60, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   orbArcOverlay: { position: 'absolute', top: 12, left: 12, width: 96, height: 96, zIndex: 5 },
-  orbHint: { color: THEME.textMuted, fontSize: 11, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase' },
+  orbHint: { color: THEME.colors.textMuted, fontSize: 11, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase' },
   orbitalContainer: { position: 'absolute', bottom: 0, alignItems: 'center', justifyContent: 'center' },
   menuItem: { position: 'absolute', alignItems: 'center', width: 80 },
   menuItemPressable: { alignItems: 'center' },
   itemCircle: { width: ITEM_SIZE, height: ITEM_SIZE, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  itemCircleActive: { backgroundColor: THEME.accent, borderColor: THEME.accent, transform: [{ scale: 1.15 }] },
-  activeIndicator: { borderColor: THEME.accent, borderWidth: 1.5 },
+  itemCircleActive: { backgroundColor: THEME.colors.accent, borderColor: THEME.colors.accent, transform: [{ scale: 1.15 }] },
+  activeIndicator: { borderColor: THEME.colors.accent, borderWidth: 1.5 },
   itemLabel: { color: '#FFF', fontSize: 8, fontWeight: '900', marginTop: 8, letterSpacing: 1 },
-
   empty: { width: SCREEN_WIDTH - 40, alignItems: 'center', justifyContent: 'center', height: 200 },
-  emptyText: { color: THEME.textMuted, letterSpacing: 3, fontSize: 12, fontWeight: '700' }
+  emptyText: { color: THEME.colors.textMuted, letterSpacing: 3, fontSize: 12, fontWeight: '700' }
 });

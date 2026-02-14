@@ -1,96 +1,109 @@
 import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { THEME } from '../../src/constants/Theme';
+import { VergeHeader } from '../../src/components/VergeHeader';
 
 export default function InfoScreen() {
   const router = useRouter();
 
   const InfoSection = ({ title, icon, children }: { title: string, icon: any, children: React.ReactNode }) => (
-    <View className="mb-6 bg-slate-900/50 border border-slate-800 rounded-3xl p-5">
-      <View className="flex-row items-center mb-4">
-        <View className="w-8 h-8 bg-blue-500/10 rounded-lg items-center justify-center">
-          <Ionicons name={icon} size={20} color="#3b82f6" />
+    <View style={styles.infoSection}>
+      <View style={styles.sectionHeader}>
+        <View style={styles.iconBox}>
+          <Ionicons name={icon} size={20} color={THEME.colors.accent} />
         </View>
-        <Text className="text-white font-bold text-lg ml-3">{title}</Text>
+        <Text style={styles.sectionTitle}>{title}</Text>
       </View>
       {children}
     </View>
   );
 
   const TimeRow = ({ label, time }: { label: string, time: string }) => (
-    <View className="flex-row justify-between py-2 border-b border-slate-800/50">
-      <Text className="text-slate-300 text-sm font-medium">{label}</Text>
-      <Text className="text-blue-400 text-sm font-bold">{time}</Text>
+    <View style={styles.timeRow}>
+      <Text style={styles.timeLabel}>{label}</Text>
+      <Text style={styles.timeValue}>{time}</Text>
     </View>
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-950">
-      {/* Header */}
-      <View className="flex-row items-center px-6 py-4 border-b border-slate-900">
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={28} color="white" />
-        </TouchableOpacity>
-        <Text className="text-white text-2xl font-bold ml-3">Campus Info</Text>
-      </View>
+    <SafeAreaView edges={['top']} style={styles.container}>
+      <LinearGradient
+        colors={[THEME.colors.bg, '#0A0A0A', THEME.colors.bg]}
+        style={StyleSheet.absoluteFill}
+      />
+      
+      <VergeHeader title="INFO" onBack={() => router.back()} />
 
-      <ScrollView className="flex-1 px-6 pt-6" showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
 
         <InfoSection title="Medical Center" icon="medkit-outline">
-          <Text className="text-slate-500 text-xs font-bold uppercase mb-2">Weekday Hours</Text>
+          <Text style={styles.subLabel}>WEEKDAY HOURS</Text>
           <TimeRow label="Morning" time="9:00 AM - 12:30 PM" />
           <TimeRow label="Evening" time="1:30 PM - 4:00 PM" />
           
-          <Text className="text-slate-500 text-xs font-bold uppercase mt-4 mb-2">Specialists</Text>
+          <Text style={[styles.subLabel, { marginTop: 16 }]}>SPECIALISTS</Text>
           <TimeRow label="Dentist (Sat)" time="4:00 PM - 7:00 PM" />
           <TimeRow label="ENT (Mon & Thu)" time="5:00 PM - 6:30 PM" />
           <TimeRow label="Homeopathic (Tue)" time="5:30 PM - 6:30 PM" />
         </InfoSection>
         
-        {/* Mess Timings */}
         <InfoSection title="Mess Timings" icon="restaurant-outline">
           <TimeRow label="Breakfast" time="7:30 AM - 9:30 AM" />
           <TimeRow label="Lunch" time="11:30 AM - 1:30 PM" />
           <TimeRow label="Dinner" time="6:30 PM - 8:00 PM" />
         </InfoSection>
 
-        {/* Food Outlets */}
         <InfoSection title="Food Outlets" icon="fast-food-outline">
           <TimeRow label="Bunny's Kitchen" time="8:30 AM - 10:00 PM" />
           <TimeRow label="Cafe Ryana" time="8:30 AM - 10:00 PM" />
           <TimeRow label="Gags Cafe" time="9:00 AM - 4:30 PM" />
           <TimeRow label="Royal Cafe" time="9:00 AM - 4:30 PM" />
-          <View className="mt-3 bg-blue-500/5 p-3 rounded-xl border border-blue-500/10">
-            <Text className="text-slate-400 text-xs leading-5">
+          <View style={styles.noteBox}>
+            <Text style={styles.noteText}>
               Note: Food stalls are functional throughout the Fest
             </Text>
           </View>
         </InfoSection>
 
-        {/* Shopping */}
         <InfoSection title="Akshay (BITS-COOP)" icon="cart-outline">
-          <Text className="text-slate-500 text-xs font-bold uppercase mb-2">Supermarket</Text>
+          <Text style={styles.subLabel}>SUPERMARKET</Text>
           <TimeRow label="Morning" time="9:00 AM - 2:00 PM" />
           <TimeRow label="Evening" time="3:30 PM - 8:30 PM" />
-          <Text className="text-slate-500 text-xs font-bold uppercase mt-4 mb-2">Vegetable Section</Text>
+          <Text style={[styles.subLabel, { marginTop: 16 }]}>VEGETABLE SECTION</Text>
           <TimeRow label="Morning" time="9:00 AM - 2:00 PM" />
           <TimeRow label="Evening" time="3:00 PM - 6:30 PM" />
         </InfoSection>
 
-        {/* Stationery */}
         <InfoSection title="S-9 (Stationery)" icon="pencil-outline">
-          <Text className="text-slate-500 text-[10px] mb-3">Location: Vyas Bhawan Warden House</Text>
+          <Text style={[styles.subLabel, { marginBottom: 12 }]}>LOCATION: VYAS BHAWAN WARDEN HOUSE</Text>
           <TimeRow label="Mon - Sat" time="9:00 AM - 8:00 PM" />
           <TimeRow label="Sunday" time="9:00 AM - 5:00 PM" />
         </InfoSection>
 
-        {/* Medical Center */}
-        
-
-        <View className="h-10" />
+        <View style={{ height: 40 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: THEME.colors.bg },
+  content: { flex: 1, paddingHorizontal: 20, paddingTop: 20 },
+  infoSection: {
+    backgroundColor: THEME.colors.cardBg, borderRadius: 24, padding: 20,
+    borderWidth: 1, borderColor: THEME.colors.border, marginBottom: 20,
+  },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  iconBox: { width: 36, height: 36, borderRadius: 10, backgroundColor: THEME.colors.accentMuted, alignItems: 'center', justifyContent: 'center' },
+  sectionTitle: { color: THEME.colors.text, fontSize: 16, fontWeight: '700', marginLeft: 12 },
+  subLabel: { color: THEME.colors.textMuted, fontSize: 9, fontWeight: '800', letterSpacing: 1.5, marginBottom: 8 },
+  timeRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: THEME.colors.border },
+  timeLabel: { color: THEME.colors.textSecondary, fontSize: 13, fontWeight: '500' },
+  timeValue: { color: THEME.colors.accent, fontSize: 13, fontWeight: '700' },
+  noteBox: { marginTop: 12, backgroundColor: 'rgba(255,107,0,0.05)', padding: 12, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,107,0,0.1)' },
+  noteText: { color: THEME.colors.textMuted, fontSize: 11, lineHeight: 18 },
+});

@@ -1,15 +1,15 @@
-import React, { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import {
   View,
   Text,
   FlatList,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   TextInput,
   Dimensions,
   Pressable,
   Image,
+  Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,23 +19,14 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withTiming,
-  interpolate,
+  FadeInDown,
 } from 'react-native-reanimated';
 import { authService } from '../../src/services/auth';
+import { THEME } from '../../src/constants/Theme';
+import { VergeHeader } from '../../src/components/VergeHeader';
+import { VergeLoader } from '../../src/components/VergeLoader';
 
-const { width } = Dimensions.get('window');
-const CARD_WIDTH = width - 40;
-
-const THEME = {
-  bg: '#050505',
-  cardBg: '#121212',
-  accent: '#FF6B00',
-  text: '#FFFFFF',
-  textMuted: '#888888',
-  border: '#1F1F1F',
-  borderLight: '#2A2A2A',
-  surface: '#0A0A0A',
-};
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const HOSTELS = [
   {
@@ -95,85 +86,126 @@ const HOSTELS = [
 ];
 
 const SECTORS = [
-  { id: 'Boys', title: 'MALE SECTOR', sub: 'Tactical Barracks' },
-  { id: 'Girls', title: 'FEMALE SECTOR', sub: 'High-Security Wing' },
+  { id: 'Boys', title: 'MALE SECTOR' },
+  { id: 'Girls', title: 'FEMALE SECTOR' },
 ];
 
-// ─── Hostel Card Component ──────────────────────────────────────────
-const HostelCard = ({ item, onPress }: { item: typeof HOSTELS[0]; onPress: (id: string) => void }) => {
+const HostelCard = React.memo(({ item, index, onPress }: { item: typeof HOSTELS[0]; index: number; onPress: (id: string) => void }) => {
   const scale = useSharedValue(1);
 
-  const handlePressIn = () => {
-    scale.value = withTiming(0.98, { duration: 150 });
-  };
+  const handlePressIn = () => { scale.value = withTiming(0.98, { duration: 150 }); };
+  const handlePressOut = () => { scale.value = withTiming(1, { duration: 150 }); };
 
-  const handlePressOut = () => {
-    scale.value = withTiming(1, { duration: 150 });
-  };
+  const animatedStyle = useAnimatedStyle(() => {
+    'worklet';
+    return { transform: [{ scale: scale.value }] };
+  });
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
+  const isGirls = item.gender === 'Girls';
+  const accentColor = isGirls ? '#FF2D55' : THEME.colors.accent;
 
   return (
-    <Animated.View style={animatedStyle}>
-      <Pressable
-        onPress={() => onPress(item.id)}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        style={styles.cardContainer}
-      >
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>{item.name}</Text>
-          <View style={[styles.tagPill, { borderColor: item.gender === 'Girls' ? '#FF6B9D' : THEME.accent }]}>
-            <Text style={[styles.tagText, { color: item.gender === 'Girls' ? '#FF6B9D' : THEME.accent }]}>
-              {item.type}
-            </Text>
-          </View>
-        </View>
+    <Animated.View 
+      entering={FadeInDown.duration(300).delay(index * 30)}
+      style={styles.cardWrapper}
+    >
+      <Animated.View style={animatedStyle}>
+        <Pressable
+          onPress={() => onPress(item.id)}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          style={styles.cardContainer}
+        >
+          <View style={styles.cardMain}>
+            <View style={styles.cardHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cardTitle}>{item.name}</Text>
+                <View style={[styles.typePill, { backgroundColor: accentColor + '15' }]}>
+                  <Text style={[styles.typeText, { color: accentColor }]}>{item.type}</Text>
+                </View>
+              </View>
+              <View style={styles.priceTag}>
+                <Text style={styles.priceValue}>{item.price}</Text>
+                <Text style={styles.priceUnit}>/ night</Text>
+              </View>
+            </View>
 
-        <View style={styles.cardInfoSection}>
-          <View style={styles.infoRow}>
-            <Ionicons name="people-outline" size={14} color={THEME.textMuted} />
-            <Text style={styles.infoText}>{item.capacity}</Text>
+            <Text style={styles.cardDesc}>{item.description}</Text>
+
+            <View style={styles.cardFeatures}>
+              <View style={styles.featureItem}>
+                <Ionicons name="people-outline" size={16} color={THEME.colors.textSecondary} />
+                <Text style={styles.featureText}>{item.capacity}</Text>
+              </View>
+              <View style={styles.bookBtn}>
+                <Text style={styles.bookBtnText}>Book Now</Text>
+                <Ionicons name="arrow-forward" size={14} color={accentColor} />
+              </View>
+            </View>
           </View>
-          <View style={styles.infoRow}>
-            <Ionicons name="pricetag-outline" size={14} color={THEME.textMuted} />
-            <Text style={[styles.infoText, { color: THEME.text }]}>{item.price} <Text style={{ color: THEME.textMuted }}>/ NIGHT</Text></Text>
-          </View>
-        </View>
-      </Pressable>
+        </Pressable>
+      </Animated.View>
     </Animated.View>
   );
-};
+});
 
 export default function Accommodation() {
   const router = useRouter();
   const [user, setUser] = useState<any | null>(null);
   const [selectedGender, setSelectedGender] = useState('Boys');
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [hasExistingBooking, setHasExistingBooking] = useState(false);
+
+  const checkExistingBooking = async (uid: string) => {
+    try {
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/accommodation/my?firebaseUid=${uid}`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.data) {
+          setHasExistingBooking(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking existing booking:', error);
+    }
+  };
 
   useEffect(() => {
-    let isMounted = true;
-    const fetchSession = async () => {
-      const currentUser = authService.getSession();
-      if (isMounted) setUser(currentUser);
-    };
-    fetchSession();
-    return () => { isMounted = false; };
+    const currentUser = authService.getSession();
+    setUser(currentUser);
+    
+    if (currentUser) {
+      checkExistingBooking(currentUser.uid).finally(() => setLoading(false));
+    } else {
+      setLoading(false);
+    }
   }, []);
 
-  const handleBooking = (id: string) => {
+  const handleBooking = useCallback((id: string) => {
     if (!user) {
-      Alert.alert("Link Lost", "Please establish session to reserve pod.");
+      Alert.alert('Link Lost', 'Please establish session to reserve pod.');
       router.replace("/login");
       return;
     }
+
+    if (hasExistingBooking) {
+      Alert.alert(
+        'Deployment Active',
+        'You already have an active accommodation assignment or pending request. Please check your deployment info.',
+        [
+          { text: 'View Deployment', onPress: () => router.push('/(Hostel)/BookedHostel' as any) },
+          { text: 'Cancel', style: 'cancel' }
+        ]
+      );
+      return;
+    }
+
     router.push({
       pathname: "/(Hostel)/HostelRegister" as any,
       params: { id: id, userId: user.uid }
     });
-  };
+  }, [user, router, hasExistingBooking]);
 
   const filteredHostels = useMemo(() => {
     return HOSTELS.filter(h => 
@@ -182,384 +214,157 @@ export default function Accommodation() {
     );
   }, [selectedGender, searchQuery]);
 
-    const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
-
-      if (viewableItems.length > 0) {
-
-        const index = viewableItems[0].index;
-
-        if (index !== null && index !== undefined) {
-
-          setSelectedGender(SECTORS[index].id);
-
-        }
-
+  const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
+    if (viewableItems.length > 0) {
+      const index = viewableItems[0].index;
+      if (index !== null && index !== undefined) {
+        setSelectedGender(SECTORS[index].id);
       }
+    }
+  }).current;
 
-    }).current;
-
-  
-
-    return (
-
+  return (
+    <View style={{ flex: 1, backgroundColor: THEME.colors.bg }}>
       <SafeAreaView edges={['top']} style={styles.container}>
-
-        <LinearGradient
-
-          colors={[THEME.bg, '#0A0A0A', THEME.bg]}
-
-          style={StyleSheet.absoluteFill}
-
-        />
-
-        
-
-        {/* Header */}
-
-        <View style={styles.header}>
-
-          <View style={styles.headerRow}>
-
-            <TouchableOpacity onPress={() => router.back()} style={styles.minimalBack}>
-
-               <Ionicons name="chevron-back" size={22} color={THEME.text} />
-
-            </TouchableOpacity>
-
-                        <View style={{ flex: 1, marginLeft: 12 }}>
-
-                          <Text style={styles.headerTitle} numberOfLines={1} adjustsFontSizeToFit>ACCOMMODATION</Text>
-
-                        </View>
-
-            <TouchableOpacity 
-
-              onPress={() => router.push('/(Hostel)/BookedHostel' as any)}
-
-              style={styles.myPodButton}
-
-            >
-
-              <Ionicons name="bed" size={20} color={THEME.accent} />
-
-            </TouchableOpacity>
-
-          </View>
-
-        </View>
-
-  
-
-        {/* Search Bar */}
-
-        <View style={styles.searchContainer}>
-
-          <View style={styles.searchBar}>
-
-            <Ionicons name="search" size={16} color={THEME.textMuted} />
-
-            <TextInput
-
-              style={styles.searchInput}
-
-              placeholder="SEARCH SECTORS..."
-
-              placeholderTextColor={THEME.textMuted}
-
-              value={searchQuery}
-
-              onChangeText={setSearchQuery}
-
-            />
-
-          </View>
-
-        </View>
-
-  
-
-        <FlatList
-
-          data={filteredHostels}
-
-          keyExtractor={(item) => item.id}
-
-          renderItem={({ item }) => <HostelCard item={item} onPress={handleBooking} />}
-
-          contentContainerStyle={styles.listContent}
-
-          showsVerticalScrollIndicator={false}
-
-          ListHeaderComponent={<Text style={styles.sectionTitle}>CHOOSE ROOM</Text>}
-
-          ListEmptyComponent={
-
-            <Text style={styles.emptyText}>NO QUARTERS AVAILABLE</Text>
-
+        <VergeHeader 
+          title="STAY" 
+          rightElement={
+            !loading && (
+              <TouchableOpacity 
+                onPress={() => router.push('/(Hostel)/BookedHostel' as any)}
+                activeOpacity={0.7}
+                style={styles.myPodButton}
+              >
+                <Ionicons name="bed-outline" size={20} color={THEME.colors.accent} />
+              </TouchableOpacity>
+            )
           }
-
         />
 
-  
+        {loading ? (
+          <VergeLoader message="LOCATING PODS" />
+        ) : (
+          <>
+            <View style={styles.searchContainer}>
+              <View style={styles.searchBar}>
+                <Ionicons name="search" size={18} color={THEME.colors.textMuted} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search available units..."
+                  placeholderTextColor={THEME.colors.textMuted}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                  selectionColor={THEME.colors.accent}
+                />
+              </View>
+            </View>
 
-        {/* Footer Sector Slider */}
+            <View style={{ flex: 1 }}>
+              <FlatList
+                data={filteredHostels}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item, index }) => <HostelCard item={item} index={index} onPress={handleBooking} />}
+                contentContainerStyle={styles.listContent}
+                showsVerticalScrollIndicator={false}
+                removeClippedSubviews={true}
+                ListHeaderComponent={<Text style={styles.sectionTitle}>Available Units</Text>}
+                ListEmptyComponent={<Text style={styles.emptyText}>No quarters found in this sector</Text>}
+              />
+              
+              <LinearGradient
+                colors={['transparent', THEME.colors.bg]}
+                style={styles.listGradient}
+                pointerEvents="none"
+              />
+            </View>
 
-        <View style={styles.footerSection}>
-
-          <View style={styles.separator} />
-
-          <FlatList
-
-            data={SECTORS}
-
-            horizontal
-
-            pagingEnabled
-
-            showsHorizontalScrollIndicator={false}
-
-            onViewableItemsChanged={onViewableItemsChanged}
-
-            viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
-
-            decelerationRate="fast"
-
-            snapToInterval={width}
-
-            keyExtractor={(item) => item.id}
-
-            renderItem={({ item }) => (
-
-              <View style={styles.sectorCardContainer}>
-
-                <View style={styles.bigSectorCard}>
-
-                  <Image 
-                    source={item.id === 'Boys' ? require('../../assets/boys.png') : require('../../assets/girls.png')} 
-                    style={[styles.sectorImage, { opacity: 0.9 }]}
-                    resizeMode="cover"
-                  />
-
-                  <LinearGradient
-                    colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.8)']}
-                    style={StyleSheet.absoluteFill}
-                  />
-
-                  <View style={styles.sectorContent}>
-                    <Text style={styles.sectorTitle}>{item.title}</Text>
-
-                    <View style={styles.indicatorContainer}>
-                      <View style={[styles.dot, selectedGender === 'Boys' ? styles.dotActive : styles.dotInactive]} />
-                      <View style={[styles.dot, selectedGender === 'Girls' ? styles.dotActive : styles.dotInactive]} />
+            <View style={styles.footerSection}>
+              <FlatList
+                data={SECTORS}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onViewableItemsChanged={onViewableItemsChanged}
+                viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
+                decelerationRate="fast"
+                snapToInterval={SCREEN_WIDTH}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <View style={styles.sectorCardContainer}>
+                    <View style={styles.sectorCard}>
+                      <Image 
+                        source={item.id === 'Boys' ? require('../../assets/boys.png') : require('../../assets/girls.png')} 
+                        style={styles.sectorImage}
+                        resizeMode="cover"
+                      />
+                      <LinearGradient 
+                        colors={['rgba(0,0,0,0.1)', 'rgba(0,0,0,0.85)']} 
+                        style={StyleSheet.absoluteFill} 
+                      />
+                      <View style={styles.sectorContent}>
+                        <Text style={styles.sectorTitle}>{item.title}</Text>
+                        <View style={styles.indicatorContainer}>
+                          <View style={[styles.dot, selectedGender === 'Boys' ? styles.dotActive : styles.dotInactive]} />
+                          <View style={[styles.dot, selectedGender === 'Girls' ? styles.dotActive : styles.dotInactive]} />
+                        </View>
+                      </View>
                     </View>
                   </View>
-
-                </View>
-
-              </View>
-
-            )}
-
-          />
-
-        </View>
-
+                )}
+              />
+            </View>
+          </>
+        )}
       </SafeAreaView>
-
-    );
-
-  }
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: THEME.bg 
-  },
-  
-  header: {
-    paddingHorizontal: 20,
-    paddingBottom: 8,
-    backgroundColor: THEME.bg,
-  },
-  headerRow: { 
-    flexDirection: 'row', 
-    alignItems: 'center' 
-  },
-  minimalBack: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: { 
-    fontSize: 20, 
-    fontFamily: 'Guardians',
-    color: THEME.text,
-    letterSpacing: 0.5,
-  },
+  container: { flex: 1 },
   myPodButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: THEME.cardBg,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: THEME.borderLight,
+    width: 44, height: 44, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)',
   },
-
-  searchContainer: {
-    paddingHorizontal: 20,
-    marginTop: 12,
-    marginBottom: 8,
-  },
+  searchContainer: { paddingHorizontal: 20, marginTop: 8, marginBottom: 4 },
   searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: THEME.cardBg,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: THEME.borderLight,
-    height: 48,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 16, paddingHorizontal: 16, height: 52, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)',
   },
-  searchInput: {
-    flex: 1,
-    height: '100%',
-    color: THEME.text,
-    fontSize: 13,
-    marginLeft: 10,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+  searchInput: { flex: 1, height: '100%', color: THEME.colors.text, fontSize: 15, marginLeft: 12, fontWeight: '500' },
+  sectionTitle: { fontSize: 13, fontWeight: '700', color: THEME.colors.textSecondary, marginTop: 20, marginBottom: 16, marginLeft: 4 },
+  listContent: { paddingHorizontal: 20, paddingBottom: 100 },
+  
+  cardWrapper: { marginBottom: 16 },
+  cardContainer: { 
+    backgroundColor: '#111', borderRadius: 24, 
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', overflow: 'hidden',
   },
+  cardMain: { padding: 20 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  cardTitle: { fontSize: 18, fontWeight: '800', color: THEME.colors.text, marginBottom: 6 },
+  typePill: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  typeText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
+  priceTag: { alignItems: 'flex-end' },
+  priceValue: { fontSize: 20, fontWeight: '900', color: THEME.colors.text },
+  priceUnit: { fontSize: 10, color: THEME.colors.textMuted, marginTop: -2 },
+  cardDesc: { fontSize: 13, color: THEME.colors.textSecondary, lineHeight: 20, marginTop: 16, marginBottom: 20 },
+  cardFeatures: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.1)', paddingTop: 16 },
+  featureItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  featureText: { fontSize: 12, fontWeight: '600', color: THEME.colors.textSecondary },
+  bookBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  bookBtnText: { fontSize: 13, fontWeight: '700', color: THEME.colors.text },
 
-  sectionTitle: {
-    paddingHorizontal: 4,
-    fontSize: 12,
-    fontWeight: '800',
-    color: THEME.text,
-    marginTop: 12,
-    marginBottom: 16,
-    letterSpacing: 1,
-  },
-
-  listContent: { 
-    paddingHorizontal: 20, 
-    paddingBottom: 20 
-  },
-
-  cardContainer: {
-    backgroundColor: '#111111',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: THEME.border,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  tagPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    borderWidth: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-  },
-  tagText: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  cardTitle: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: THEME.text,
-    letterSpacing: 0.5,
-    flex: 1,
-    marginRight: 12,
-  },
-  cardInfoSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  infoText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: THEME.textMuted,
-  },
-
-  separator: {
-    height: 1,
-    backgroundColor: THEME.border,
-    marginHorizontal: 20,
-    marginBottom: 16,
-  },
-
-  footerSection: {
-    paddingBottom: 20,
-  },
-  sectorCardContainer: {
-    width: width,
-    paddingHorizontal: 20,
-  },
-  bigSectorCard: {
-    height: 220,
-    backgroundColor: '#000000',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: THEME.border,
-    overflow: 'hidden',
-  },
-  sectorImage: {
-    width: '100%',
-    height: '100%',
-    position: 'absolute',
-  },
-  sectorContent: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  sectorTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: THEME.text,
-    letterSpacing: 2,
-  },
-  indicatorContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 20,
-  },
-  dot: {
-    height: 4,
-    borderRadius: 2,
-  },
-  dotActive: {
-    width: 20,
-    backgroundColor: THEME.accent,
-  },
-  dotInactive: {
-    width: 8,
-    backgroundColor: THEME.borderLight,
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: THEME.textMuted,
-    marginTop: 40,
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
+  listGradient: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 80, zIndex: 10 },
+  footerSection: { paddingBottom: 24, paddingTop: 10 },
+  sectorCardContainer: { width: SCREEN_WIDTH, paddingHorizontal: 20 },
+  sectorCard: { height: 140, backgroundColor: '#000', borderRadius: 28, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', overflow: 'hidden' },
+  sectorImage: { width: '100%', height: '100%', position: 'absolute' },
+  sectorContent: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 20 },
+  sectorTitle: { fontSize: 22, fontWeight: '900', color: THEME.colors.text, letterSpacing: 1 },
+  indicatorContainer: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  dot: { height: 4, borderRadius: 2 },
+  dotActive: { width: 24, backgroundColor: THEME.colors.accent },
+  dotInactive: { width: 8, backgroundColor: 'rgba(255,255,255,0.45)' },
+  emptyText: { textAlign: 'center', color: THEME.colors.textMuted, marginTop: 40, fontSize: 13, fontWeight: '600' },
 });

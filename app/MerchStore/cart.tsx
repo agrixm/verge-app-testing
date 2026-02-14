@@ -5,18 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useCart } from '../../src/context/CartContext';
-
-const THEME = {
-  bg: '#050505',
-  cardBg: '#121212',
-  accent: '#FF6B00',
-  text: '#FFFFFF',
-  textMuted: '#888888',
-  border: '#1F1F1F',
-  borderLight: '#2A2A2A',
-  surface: '#0A0A0A',
-  success: '#00C853',
-};
+import { THEME } from '../../src/constants/Theme';
+import { VergeHeader } from '../../src/components/VergeHeader';
 
 export default function Cart() {
   const router = useRouter();
@@ -26,6 +16,11 @@ export default function Cart() {
   const subtotal = cart?.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0) || 0;
   const platformFee = cart?.length > 0 ? 20 : 0;
   const finalTotal = subtotal + platformFee;
+
+  const handleBack = () => {
+    if (router.canGoBack()) router.back();
+    else router.push('/(tabs)/merch');
+  };
 
   const internalRemove = (id: string) => {
     if (removeFromCart) {
@@ -81,7 +76,7 @@ export default function Cart() {
           style={styles.qtyButton}
           hitSlop={8}
         >
-          <Ionicons name="remove" size={16} color={THEME.text} />
+          <Ionicons name="remove" size={16} color={THEME.colors.text} />
         </Pressable>
         <Text style={styles.qtyValue}>{item.quantity}</Text>
         <Pressable
@@ -89,7 +84,7 @@ export default function Cart() {
           style={styles.qtyButton}
           hitSlop={8}
         >
-          <Ionicons name="add" size={16} color={THEME.text} />
+          <Ionicons name="add" size={16} color={THEME.colors.text} />
         </Pressable>
       </View>
     </View>
@@ -98,30 +93,21 @@ export default function Cart() {
   return (
     <SafeAreaView edges={['top']} style={styles.container}>
       <LinearGradient
-        colors={[THEME.bg, '#0A0A0A', THEME.bg]}
+        colors={[THEME.colors.bg, '#0A0A0A', THEME.colors.bg]}
         style={StyleSheet.absoluteFill}
       />
       
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity 
-            onPress={() => router.canGoBack() ? router.back() : router.push('/(tabs)/merch')} 
-            style={styles.backButton}
-          >
-            <Ionicons name="chevron-back" size={22} color={THEME.text} />
-          </TouchableOpacity>
-          <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={styles.headerTitle}>CART</Text>
-            <Text style={styles.headerSubtitle}>Review your gear</Text>
-          </View>
-          {cart?.length > 0 && (
+      <VergeHeader 
+        title="CART" 
+        onBack={handleBack}
+        rightElement={
+          cart?.length > 0 && (
             <TouchableOpacity onPress={internalClear}>
               <Text style={styles.clearText}>CLEAR</Text>
             </TouchableOpacity>
-          )}
-        </View>
-      </View>
+          )
+        }
+      />
 
       {cart?.length > 0 ? (
         <>
@@ -153,7 +139,7 @@ export default function Cart() {
               style={styles.checkoutButton}
             >
               <LinearGradient
-                colors={[THEME.accent, '#FF8C00']}
+                colors={[THEME.colors.accent, '#FF8C00']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.checkoutGradient}
@@ -169,7 +155,7 @@ export default function Cart() {
       ) : (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIconBox}>
-            <Ionicons name="bag-handle" size={64} color={THEME.border} />
+            <Ionicons name="bag-handle" size={64} color={THEME.colors.border} />
           </View>
           <Text style={styles.emptyTitle}>YOUR BAG IS EMPTY</Text>
           <Text style={styles.emptyDesc}>
@@ -190,51 +176,24 @@ export default function Cart() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: THEME.bg,
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingBottom: 8,
-    backgroundColor: THEME.bg,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: THEME.text,
-    letterSpacing: 0.5,
-  },
-  headerSubtitle: {
-    fontSize: 11,
-    color: THEME.textMuted,
-    marginTop: 0,
-    letterSpacing: 0.3,
+    backgroundColor: THEME.colors.bg,
   },
   clearText: {
-    color: THEME.textMuted,
+    color: THEME.colors.textMuted,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 1,
   },
   listContent: {
     padding: 20,
-    paddingBottom: 100,
+    paddingBottom: 220,
   },
   cartItem: {
-    backgroundColor: THEME.cardBg,
+    backgroundColor: THEME.colors.cardBg,
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: THEME.border,
+    borderColor: THEME.colors.border,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 16,
@@ -243,7 +202,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 8,
-    backgroundColor: THEME.surface,
+    backgroundColor: THEME.colors.surface,
   },
   itemDetails: {
     flex: 1,
@@ -251,23 +210,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   itemTitle: {
-    color: THEME.text,
+    color: THEME.colors.text,
     fontSize: 14,
     fontWeight: '700',
     marginBottom: 4,
   },
   itemPrice: {
-    color: THEME.accent,
+    color: THEME.colors.accent,
     fontSize: 16,
     fontWeight: '900',
   },
   qtyBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: THEME.surface,
+    backgroundColor: THEME.colors.surface,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: THEME.borderLight,
+    borderColor: THEME.colors.borderLight,
     paddingHorizontal: 6,
     paddingVertical: 4,
     gap: 6,
@@ -280,22 +239,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#101010',
     borderWidth: 1,
-    borderColor: THEME.borderLight,
+    borderColor: THEME.colors.borderLight,
   },
   qtyValue: {
     minWidth: 18,
     textAlign: 'center',
-    color: THEME.text,
+    color: THEME.colors.text,
     fontSize: 12,
     fontWeight: '800',
   },
   summaryContainer: {
-    backgroundColor: THEME.cardBg,
+    backgroundColor: THEME.colors.cardBg,
     padding: 24,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderTopWidth: 1,
-    borderColor: THEME.border,
+    borderColor: THEME.colors.border,
     position: 'absolute',
     bottom: 0,
     left: 0,
@@ -307,13 +266,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   summaryLabel: {
-    color: THEME.textMuted,
+    color: THEME.colors.textMuted,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 1,
   },
   summaryValue: {
-    color: THEME.text,
+    color: THEME.colors.text,
     fontWeight: '700',
     fontSize: 12,
   },
@@ -324,17 +283,17 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: THEME.border,
+    borderTopColor: THEME.colors.border,
     marginBottom: 24,
   },
   totalLabel: {
-    color: THEME.text,
+    color: THEME.colors.text,
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: 1,
   },
   totalValue: {
-    color: THEME.accent,
+    color: THEME.colors.accent,
     fontSize: 24,
     fontWeight: '900',
   },
@@ -365,15 +324,15 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: THEME.cardBg,
+    backgroundColor: THEME.colors.cardBg,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: THEME.border,
+    borderColor: THEME.colors.border,
   },
   emptyTitle: {
-    color: THEME.text,
+    color: THEME.colors.text,
     fontSize: 18,
     fontWeight: '900',
     letterSpacing: 1,
@@ -381,22 +340,22 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   emptyDesc: {
-    color: THEME.textMuted,
+    color: THEME.colors.textMuted,
     textAlign: 'center',
     fontSize: 13,
     lineHeight: 20,
     marginBottom: 32,
   },
   goStoreButton: {
-    backgroundColor: THEME.surface,
+    backgroundColor: THEME.colors.surface,
     paddingHorizontal: 32,
     paddingVertical: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: THEME.borderLight,
+    borderColor: THEME.colors.borderLight,
   },
   goStoreText: {
-    color: THEME.text,
+    color: THEME.colors.text,
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 1,

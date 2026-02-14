@@ -13,22 +13,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { authService } from '../../src/services/auth';
+import { THEME } from '../../src/constants/Theme';
+import { VergeHeader } from '../../src/components/VergeHeader';
 import QRCode from 'react-native-qrcode-svg';
 
 const SERVER_URL = process.env.EXPO_PUBLIC_API_URL;
-
-const THEME = {
-  bg: '#050505',
-  cardBg: '#121212',
-  accent: '#FF6B00',
-  text: '#FFFFFF',
-  textMuted: '#888888',
-  border: '#1F1F1F',
-  borderLight: '#2A2A2A',
-  surface: '#0A0A0A',
-  success: '#00C853',
-  warning: '#FFB300',
-};
 
 interface Booking {
   verified: boolean;
@@ -73,7 +62,7 @@ export default function BookedHostel() {
         }
         setBooking(null);
       }
-    } catch (error: any) {
+    } catch {
       if (__DEV__) console.error("Fetch booking error");
       setErrorMsg("Network offline.");
     } finally {
@@ -94,7 +83,7 @@ export default function BookedHostel() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator color={THEME.accent} size="large" />
+        <ActivityIndicator color={THEME.colors.accent} size="large" />
         <Text style={styles.loadingText}>SYNCING DATA...</Text>
       </View>
     );
@@ -103,29 +92,16 @@ export default function BookedHostel() {
   return (
     <SafeAreaView edges={['top']} style={styles.container}>
       <LinearGradient
-        colors={[THEME.bg, '#0A0A0A', THEME.bg]}
+        colors={[THEME.colors.bg, '#0A0A0A', THEME.colors.bg]}
         style={StyleSheet.absoluteFill}
       />
 
-      <View style={styles.header}>
-        <View style={styles.headerRow}>
-          <TouchableOpacity 
-            onPress={() => router.back()}
-            style={styles.backButton}
-          >
-            <Ionicons name="chevron-back" size={22} color={THEME.text} />
-          </TouchableOpacity>
-          <View style={{ flex: 1, marginLeft: 12 }}>
-            <Text style={styles.headerTitle}>DEPLOYMENT INFO</Text>
-            <Text style={styles.headerSubtitle}>Personal assignment briefing</Text>
-          </View>
-        </View>
-      </View>
+      <VergeHeader title="DEPLOYMENT" onBack={() => router.back()} />
 
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={THEME.accent} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={THEME.colors.accent} />}
       >
         {booking ? (
           <View style={styles.briefingContainer}>
@@ -133,13 +109,13 @@ export default function BookedHostel() {
             <View style={styles.statusBanner}>
               <View style={[
                 styles.statusIndicator, 
-                { backgroundColor: booking.verified ? THEME.success : THEME.warning }
+                { backgroundColor: booking.verified ? THEME.colors.success : THEME.colors.danger }
               ]} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.statusLabel}>OPERATIONAL STATUS</Text>
                 <Text style={[
                   styles.statusValue, 
-                  { color: booking.verified ? THEME.success : THEME.warning }
+                  { color: booking.verified ? THEME.colors.success : THEME.colors.danger }
                 ]}>
                   {booking.verified ? 'ACCESS VERIFIED' : 'PENDING CLEARANCE'}
                 </Text>
@@ -147,7 +123,7 @@ export default function BookedHostel() {
               <Ionicons 
                 name={booking.verified ? "shield-checkmark" : "warning"} 
                 size={24} 
-                color={booking.verified ? THEME.success : THEME.warning} 
+                color={booking.verified ? THEME.colors.success : THEME.colors.danger} 
               />
             </View>
 
@@ -177,7 +153,7 @@ export default function BookedHostel() {
                   <Text style={styles.statLabel}>PAYMENT</Text>
                   <Text style={[
                     styles.statValue, 
-                    { color: booking.paymentStatus === 'paid' ? THEME.success : THEME.accent }
+                    { color: booking.paymentStatus === 'paid' ? THEME.colors.success : THEME.colors.accent }
                   ]}>
                     {booking.paymentStatus.toUpperCase()}
                   </Text>
@@ -200,7 +176,7 @@ export default function BookedHostel() {
                       color="#000"
                     />
                   ) : (
-                    <ActivityIndicator color={THEME.accent} />
+                    <ActivityIndicator color={THEME.colors.accent} />
                   )}
                 </View>
                 {/* Corner Accents */}
@@ -213,7 +189,7 @@ export default function BookedHostel() {
 
             {booking.verifiedAt && (
               <View style={styles.logFooter}>
-                <Ionicons name="time-outline" size={12} color={THEME.textMuted} />
+                <Ionicons name="time-outline" size={12} color={THEME.colors.textMuted} />
                 <Text style={styles.logText}>
                   LAST SYNC: {new Date(booking.verifiedAt).toLocaleString().toUpperCase()}
                 </Text>
@@ -223,7 +199,7 @@ export default function BookedHostel() {
         ) : (
           <View style={styles.emptyContainer}>
             <View style={styles.emptyIconBox}>
-              <Ionicons name="alert-circle-outline" size={48} color={THEME.borderLight} />
+              <Ionicons name="alert-circle-outline" size={48} color={THEME.colors.borderLight} />
             </View>
             <Text style={styles.emptyTitle}>NO DEPLOYMENT DATA</Text>
             <Text style={styles.emptyDesc}>
@@ -246,49 +222,20 @@ export default function BookedHostel() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: THEME.bg,
+    backgroundColor: THEME.colors.bg,
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: THEME.bg,
+    backgroundColor: THEME.colors.bg,
     justifyContent: 'center',
     alignItems: 'center',
     gap: 16,
   },
   loadingText: {
-    color: THEME.textMuted,
+    color: THEME.colors.textMuted,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 2,
-  },
-  header: {
-    paddingHorizontal: 20,
-    paddingBottom: 8,
-    backgroundColor: THEME.bg,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: THEME.text,
-    letterSpacing: 1,
-  },
-  headerSubtitle: {
-    fontSize: 10,
-    color: THEME.textMuted,
-    marginTop: 0,
-    letterSpacing: 0.5,
-    fontWeight: '700',
-    textTransform: 'uppercase',
   },
   content: {
     flex: 1,
@@ -301,11 +248,11 @@ const styles = StyleSheet.create({
   statusBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: THEME.cardBg,
+    backgroundColor: THEME.colors.cardBg,
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: THEME.border,
+    borderColor: THEME.colors.border,
     gap: 16,
   },
   statusIndicator: {
@@ -316,7 +263,7 @@ const styles = StyleSheet.create({
   statusLabel: {
     fontSize: 9,
     fontWeight: '800',
-    color: THEME.textMuted,
+    color: THEME.colors.textMuted,
     letterSpacing: 1,
   },
   statusValue: {
@@ -325,10 +272,10 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   mainCard: {
-    backgroundColor: THEME.cardBg,
+    backgroundColor: THEME.colors.cardBg,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: THEME.border,
+    borderColor: THEME.colors.border,
     overflow: 'hidden',
   },
   cardSection: {
@@ -337,32 +284,32 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 9,
     fontWeight: '800',
-    color: THEME.textMuted,
+    color: THEME.colors.textMuted,
     letterSpacing: 1.5,
     marginBottom: 8,
   },
   hostelName: {
     fontSize: 20,
     fontWeight: '900',
-    color: THEME.text,
+    color: THEME.colors.text,
     letterSpacing: 0.5,
   },
   roomNumber: {
     fontSize: 32,
     fontWeight: '900',
-    color: THEME.accent,
+    color: THEME.colors.accent,
     letterSpacing: 1,
   },
   divider: {
     height: 1,
-    backgroundColor: THEME.border,
+    backgroundColor: THEME.colors.border,
     marginHorizontal: 20,
   },
   statsRow: {
     flexDirection: 'row',
-    backgroundColor: THEME.surface,
+    backgroundColor: THEME.colors.surface,
     borderTopWidth: 1,
-    borderTopColor: THEME.border,
+    borderTopColor: THEME.colors.border,
   },
   statItem: {
     flex: 1,
@@ -372,36 +319,36 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 8,
     fontWeight: '800',
-    color: THEME.textMuted,
+    color: THEME.colors.textMuted,
     letterSpacing: 1,
     marginBottom: 4,
   },
   statValue: {
     fontSize: 14,
     fontWeight: '900',
-    color: THEME.text,
+    color: THEME.colors.text,
   },
   verticalDivider: {
     width: 1,
-    backgroundColor: THEME.border,
+    backgroundColor: THEME.colors.border,
   },
   qrBriefing: {
     alignItems: 'center',
-    backgroundColor: THEME.cardBg,
+    backgroundColor: THEME.colors.cardBg,
     padding: 24,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: THEME.border,
+    borderColor: THEME.colors.border,
   },
   qrLabel: {
     fontSize: 12,
     fontWeight: '900',
-    color: THEME.text,
+    color: THEME.colors.text,
     letterSpacing: 2,
   },
   qrSubLabel: {
     fontSize: 9,
-    color: THEME.textMuted,
+    color: THEME.colors.textMuted,
     marginTop: 4,
     marginBottom: 24,
     fontWeight: '700',
@@ -420,7 +367,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: 20,
     height: 20,
-    borderColor: THEME.accent,
+    borderColor: THEME.colors.accent,
   },
   topLeft: {
     top: 0,
@@ -455,7 +402,7 @@ const styles = StyleSheet.create({
   },
   logText: {
     fontSize: 8,
-    color: THEME.textMuted,
+    color: THEME.colors.textMuted,
     fontWeight: '700',
     letterSpacing: 0.5,
   },
@@ -468,22 +415,22 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: THEME.cardBg,
+    backgroundColor: THEME.colors.cardBg,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: THEME.border,
+    borderColor: THEME.colors.border,
     marginBottom: 24,
   },
   emptyTitle: {
-    color: THEME.text,
+    color: THEME.colors.text,
     fontSize: 16,
     fontWeight: '900',
     letterSpacing: 1,
     marginBottom: 12,
   },
   emptyDesc: {
-    color: THEME.textMuted,
+    color: THEME.colors.textMuted,
     textAlign: 'center',
     fontSize: 12,
     lineHeight: 18,
@@ -491,7 +438,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   exploreButton: {
-    backgroundColor: THEME.accent,
+    backgroundColor: THEME.colors.accent,
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderRadius: 12,

@@ -5,14 +5,13 @@ import {
   ScrollView,
   Pressable,
   TextInput,
-  Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Keyboard,
-  Modal,
   StyleSheet,
-  TouchableOpacity
+  TouchableOpacity,
+  Alert, Modal
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -85,7 +84,7 @@ export default function HostelRegister() {
           firebaseUid: session.uid,
         }));
       }
-    } catch (error) {
+    } catch {
       if (__DEV__) console.error('Error fetching user for hostel');
     } finally {
       setLoading(false);
@@ -106,12 +105,12 @@ export default function HostelRegister() {
 
   const handlePreCheck = () => {
     if (isGenderMismatched()) {
-      Alert.alert("Access Denied", "Gender mismatch with selected hostel.");
+      Alert.alert('Access Denied', 'Gender mismatch with selected hostel.');
       return;
     }
 
     if (!form.phone || form.phone.length < 10) {
-      Alert.alert("Required", "Please enter a valid WhatsApp number.");
+      Alert.alert('Required', 'Please enter a valid WhatsApp number.');
       return;
     }
 
@@ -145,7 +144,7 @@ export default function HostelRegister() {
         handleFinalizeBooking(data.razorpay_payment_id);
       }).catch((error: any) => {
         if (__DEV__) console.error("Razorpay Error");
-        Alert.alert("Payment Failed", `Reason: ${error.description || error.message}`);
+        Alert.alert('Payment Failed', `Reason: ${error.description || error.message}`);
       });
     }, 2000);
   };
@@ -170,8 +169,8 @@ export default function HostelRegister() {
 
       if (response.ok) {
         setSubmitting(false);
-        Alert.alert("Booking Confirmed", "Your accommodation has been secured.", [
-          { text: "View Ticket", onPress: () => router.replace('/(Hostel)/BookedHostel' as any) }
+        Alert.alert('Booking Confirmed', 'Your accommodation has been secured.', [
+          { text: 'View Ticket', onPress: () => router.replace('/(Hostel)/BookedHostel' as any) },
         ]);
       } else {
         const errorData = await response.json();
@@ -179,7 +178,10 @@ export default function HostelRegister() {
       }
     } catch (error: any) {
       setSubmitting(false);
-      Alert.alert("Sync Error", `Payment successful but booking failed: ${error.message}. Contact support with Payment ID: ${paymentId}`);
+      Alert.alert(
+        'Sync Error',
+        `Payment successful but booking failed: ${error.message}. Contact support with Payment ID: ${paymentId}`,
+      );
     }
   };
 
@@ -310,28 +312,36 @@ export default function HostelRegister() {
       </KeyboardAvoidingView>
 
       {/* Payment Confirmation Modal */}
-      <Modal visible={showPaymentModal} transparent={true} animationType="slide">
+      <Modal
+        visible={showPaymentModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowPaymentModal(false)}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>PAYMENT SUMMARY</Text>
             <View style={styles.summaryList}>
-              <View style={styles.summaryRow}><Text style={styles.summaryLabel}>ACCOMMODATION</Text><Text style={styles.summaryValue}>{hostelName}</Text></View>
-              <View style={styles.summaryRow}><Text style={styles.summaryLabel}>DURATION</Text><Text style={styles.summaryValue}>{form.days} DAYS</Text></View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>ACCOMMODATION</Text>
+                <Text style={styles.summaryValue}>{hostelName}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>DURATION</Text>
+                <Text style={styles.summaryValue}>{form.days} DAYS</Text>
+              </View>
               <View style={styles.modalDivider} />
-              <View style={styles.summaryRow}><Text style={[styles.summaryLabel, { color: THEME.accent }]}>PAYABLE</Text><Text style={[styles.summaryValue, { color: THEME.accent, fontSize: 18 }]}>₹{totalAmount}</Text></View>
+              <View style={styles.summaryRow}>
+                <Text style={[styles.summaryLabel, { color: THEME.accent }]}>PAYABLE</Text>
+                <Text style={[styles.summaryValue, { color: THEME.accent, fontSize: 18 }]}>₹{totalAmount}</Text>
+              </View>
             </View>
             <View style={styles.modalActions}>
-              <TouchableOpacity
-                onPress={startRazorpayPayment}
-                style={styles.modalPrimaryButton}
-              >
+              <TouchableOpacity onPress={startRazorpayPayment} style={styles.modalPrimaryButton}>
                 <Text style={styles.modalPrimaryText}>PAY NOW</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setShowPaymentModal(false)}
-                style={styles.modalSecondaryButton}
-              >
+              <TouchableOpacity onPress={() => setShowPaymentModal(false)} style={styles.modalSecondaryButton}>
                 <Text style={styles.modalSecondaryText}>CANCEL</Text>
               </TouchableOpacity>
             </View>
@@ -339,13 +349,19 @@ export default function HostelRegister() {
         </View>
       </Modal>
 
-      {/* Secure Connection Popup */}
-      <Modal visible={isEstablishingConnection} transparent={true} animationType="fade">
+      {/* Secure Connection Modal */}
+      <Modal
+        visible={isEstablishingConnection}
+        transparent
+        animationType="fade"
+      >
         <View style={styles.loaderOverlay}>
-          <View style={styles.loaderBox}>
-            <ActivityIndicator size="large" color={THEME.accent} />
-            <Text style={styles.loaderTitle}>SECURE GATEWAY</Text>
-            <Text style={styles.loaderDesc}>DO NOT CLOSE</Text>
+          <View style={{ backgroundColor: THEME.cardBg, padding: 30, borderRadius: 20, alignItems: 'center', borderWidth: 1, borderColor: THEME.border }}>
+            <Text style={[styles.modalTitle, { marginBottom: 10 }]}>SECURE GATEWAY</Text>
+            <Text style={[styles.summaryLabel, { marginBottom: 20 }]}>DO NOT CLOSE</Text>
+            <View style={styles.loaderBox}>
+              <ActivityIndicator size="large" color={THEME.accent} />
+            </View>
           </View>
         </View>
       </Modal>
@@ -632,25 +648,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(5,5,5,0.9)',
   },
   loaderBox: {
-    backgroundColor: THEME.cardBg,
-    padding: 32,
-    borderRadius: 24,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: THEME.border,
-  },
-  loaderTitle: {
-    color: THEME.text,
-    fontSize: 16,
-    fontWeight: '900',
-    marginTop: 16,
-    letterSpacing: 1,
-  },
-  loaderDesc: {
-    color: THEME.error,
-    fontSize: 12,
-    fontWeight: '800',
-    marginTop: 4,
-    letterSpacing: 1,
+    paddingVertical: 6,
   },
 });

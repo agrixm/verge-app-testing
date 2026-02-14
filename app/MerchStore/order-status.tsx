@@ -1,22 +1,10 @@
 import React from 'react';
-import { View, Text, Pressable, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-
-const THEME = {
-  bg: '#050505',
-  cardBg: '#121212',
-  accent: '#FF6B00',
-  text: '#FFFFFF',
-  textMuted: '#888888',
-  border: '#1F1F1F',
-  borderLight: '#2A2A2A',
-  surface: '#0A0A0A',
-  success: '#00C853',
-  error: '#FF3D00',
-};
+import { THEME } from '../../src/constants/Theme';
 
 export default function OrderStatus() {
     const router = useRouter();
@@ -26,7 +14,7 @@ export default function OrderStatus() {
     return (
         <SafeAreaView style={styles.container}>
             <LinearGradient
-                colors={[THEME.bg, '#0A0A0A', THEME.bg]}
+                colors={[THEME.colors.bg, '#0A0A0A', THEME.colors.bg]}
                 style={StyleSheet.absoluteFill}
             />
 
@@ -38,7 +26,7 @@ export default function OrderStatus() {
                     <Ionicons
                         name={isSuccess ? "checkmark-sharp" : "close-sharp"}
                         size={48}
-                        color={isSuccess ? THEME.success : THEME.error}
+                        color={isSuccess ? THEME.colors.success : THEME.colors.danger}
                     />
                 </View>
 
@@ -73,7 +61,7 @@ export default function OrderStatus() {
                         style={styles.primaryButton}
                     >
                         <LinearGradient
-                            colors={[THEME.accent, '#FF8C00']}
+                            colors={[THEME.colors.accent, '#FF8C00']}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                             style={styles.gradientButton}
@@ -97,7 +85,7 @@ export default function OrderStatus() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: THEME.bg,
+    backgroundColor: THEME.colors.bg,
   },
   content: {
     flex: 1,
@@ -125,14 +113,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '900',
-    color: THEME.text,
+    color: THEME.colors.text,
     letterSpacing: 1,
     marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
     fontSize: 12,
-    color: THEME.textMuted,
+    color: THEME.colors.textMuted,
     fontWeight: '700',
     letterSpacing: 1,
     textAlign: 'center',
@@ -141,11 +129,11 @@ const styles = StyleSheet.create({
   },
   detailsCard: {
     width: '100%',
-    backgroundColor: THEME.cardBg,
+    backgroundColor: THEME.colors.cardBg,
     borderRadius: 16,
     padding: 24,
     borderWidth: 1,
-    borderColor: THEME.border,
+    borderColor: THEME.colors.border,
     marginBottom: 32,
   },
   detailRow: {
@@ -154,26 +142,26 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   detailLabel: {
-    color: THEME.textMuted,
+    color: THEME.colors.textMuted,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 1,
   },
   detailValue: {
-    color: THEME.text,
+    color: THEME.colors.text,
     fontSize: 12,
     fontWeight: '700',
   },
   divider: {
     height: 1,
-    backgroundColor: THEME.border,
+    backgroundColor: THEME.colors.border,
     marginVertical: 16,
   },
   verificationRow: {
     alignItems: 'center',
   },
   verificationText: {
-    color: THEME.success,
+    color: THEME.colors.success,
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 1,
@@ -197,15 +185,15 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   secondaryButton: {
-    backgroundColor: THEME.surface,
+    backgroundColor: THEME.colors.surface,
     paddingVertical: 18,
     alignItems: 'center',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: THEME.borderLight,
+    borderColor: THEME.colors.borderLight,
   },
   secondaryButtonText: {
-    color: THEME.textMuted,
+    color: THEME.colors.textMuted,
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 1,

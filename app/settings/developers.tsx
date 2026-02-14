@@ -7,11 +7,14 @@ import {
   Image, 
   Modal, 
   Linking, 
-  Platform 
+  StyleSheet
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { THEME } from '../../src/constants/Theme';
+import { VergeHeader } from '../../src/components/VergeHeader';
 
 // --- TEAM DATA ---
 const TEAM = [
@@ -19,9 +22,9 @@ const TEAM = [
     id: 1,
     name: "Sanskar Bhadani",
     role: "App Developer",
-    image: "https://via.placeholder.com/150", // Replace with your actual image
+    image: "https://via.placeholder.com/150", 
     quote: "Code is like humor. When you have to explain it, it’s bad.",
-    about: "Full-stack mobile developer specializing in React Native and high-performance backend systems. Passionate about building seamless user experiences for Verge 2026. Dedicated to creating robust architectures that scale.",
+    about: "Full-stack mobile developer specializing in React Native and high-performance backend systems. Passionate about building seamless user experiences for Verge 2026.",
     socials: {
       instagram: "https://instagram.com/sanskarbhadani08",
       linkedin: "https://linkedin.com/",
@@ -34,28 +37,26 @@ const TEAM = [
     role: "Web Developer",
     image: "https://via.placeholder.com/150",
     quote: "First, solve the problem. Then, write the code.",
-    about: "Expert in frontend architecture and reactive design. Handling the core web infrastructure and dashboard systems for the festival to ensure a smooth digital experience for all participants.",
+    about: "Expert in frontend architecture and reactive design. Handling the core web infrastructure and dashboard systems for the festival.",
     socials: {
       instagram: "https://instagram.com/",
       linkedin: "https://linkedin.com/",
       github: "https://github.com/"
     }
   },
-  
   {
     id: 3,
     name: "Anmol Sinha",
     role: "Developer",
-    image: "https://via.placeholder.com/150", // Replace with your actual image
+    image: "https://via.placeholder.com/150",
     quote: "7+7=77",
-    about: "Full-stack mobile developer specializing in React Native and high-performance backend systems. Passionate about building seamless user experiences for Verge 2026. Dedicated to creating robust architectures that scale.",
+    about: "Mobile developer passionate about building seamless user experiences for Verge 2026. Dedicated to creating robust architectures that scale.",
     socials: {
       instagram: "https://instagram.com/sanskarbhadani08",
       linkedin: "https://linkedin.com/",
       github: "https://github.com/"
     }
   }
-
 ];
 
 export default function Developers() {
@@ -67,150 +68,101 @@ export default function Developers() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-950">
-      {/* Header */}
-      <View className="flex-row items-center px-6 py-4 border-b border-slate-900">
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={28} color="white" />
-        </TouchableOpacity>
-        <View className="ml-4">
-          <Text className="text-white text-2xl font-black uppercase tracking-tighter">
-            VERGE DEVELOPERS
-          </Text>
-          <Text className="text-[#FF6B00] text-[8px] font-black uppercase tracking-[3px]">
-            System Architects
-          </Text>
-        </View>
-      </View>
+    <SafeAreaView edges={['top']} style={styles.container}>
+      <LinearGradient
+        colors={[THEME.colors.bg, '#0A0A0A', THEME.colors.bg]}
+        style={StyleSheet.absoluteFill}
+      />
+      
+      <VergeHeader title="TEAM" onBack={() => router.back()} />
 
-      {/* Main List */}
-      <ScrollView className="flex-1 px-4 pt-6" showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {TEAM.map((dev) => (
           <TouchableOpacity 
             key={dev.id}
             onPress={() => setSelectedDev(dev)}
             activeOpacity={0.9}
-            className="flex-row bg-slate-900/40 border border-slate-800 rounded-[32px] p-5 mb-4 overflow-hidden"
+            style={styles.devCard}
           >
-            {/* Left side dev pic */}
-            <Image 
-              source={{ uri: dev.image }} 
-              className="w-24 h-24 rounded-2xl bg-slate-800 border border-slate-700"
-            />
+            <Image source={{ uri: dev.image }} style={styles.devThumb} />
 
-            {/* Right side info */}
-            <View className="ml-5 flex-1 justify-center">
-              <View className="bg-[#FF6B00] self-start px-2 py-0.5 rounded-md mb-1">
-                <Text className="text-white text-[9px] font-black uppercase italic">
-                  {dev.role}
-                </Text>
+            <View style={styles.devInfo}>
+              <View style={styles.roleBadge}>
+                <Text style={styles.roleText}>{dev.role.toUpperCase()}</Text>
               </View>
-              <Text className="text-white text-xl font-black uppercase italic tracking-tight mb-3">
-                {dev.name}
-              </Text>
+              <Text style={styles.devName}>{dev.name.toUpperCase()}</Text>
 
-              {/* Social Links */}
-              <View className="flex-row gap-x-5">
+              <View style={styles.socialRow}>
                 <TouchableOpacity onPress={() => openLink(dev.socials.instagram)}>
-                  <Ionicons name="logo-instagram" size={18} color="#FF6B00" />
+                  <Ionicons name="logo-instagram" size={18} color={THEME.colors.accent} />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => openLink(dev.socials.linkedin)}>
-                  <Ionicons name="logo-linkedin" size={18} color="#FF6B00" />
+                  <Ionicons name="logo-linkedin" size={18} color={THEME.colors.accent} />
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => openLink(dev.socials.github)}>
-                  <Ionicons name="logo-github" size={18} color="#FF6B00" />
+                  <Ionicons name="logo-github" size={18} color={THEME.colors.accent} />
                 </TouchableOpacity>
               </View>
             </View>
           </TouchableOpacity>
         ))}
-        <View className="h-10" />
+        <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Profile Modal */}
       <Modal
         visible={!!selectedDev}
         animationType="slide"
         transparent={true}
         onRequestClose={() => setSelectedDev(null)}
       >
-        <View className="flex-1 justify-end bg-black/90">
-          <View className="bg-slate-950 h-full rounded-t-[40px] border-t border-blue-500/30 overflow-hidden">
-            
-            {/* Top Down Arrow Box */}
-            <View className="items-center mt-6 mb-2">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
               <TouchableOpacity 
                 onPress={() => setSelectedDev(null)}
-                className="bg-slate-900 w-14 h-14 rounded-2xl items-center justify-center border border-slate-800 shadow-2xl"
+                style={styles.closeBtn}
               >
-                <Ionicons name="chevron-down" size={28} color="#3b82f6" />
+                <Ionicons name="chevron-down" size={28} color={THEME.colors.accent} />
               </TouchableOpacity>
             </View>
 
-            <ScrollView className="flex-1 px-8 pt-6" showsVerticalScrollIndicator={false}>
-              
-              {/* Profile Header Block */}
-              <View className="flex-row items-center mb-10">
-                <Image 
-                  source={{ uri: selectedDev?.image }} 
-                  className="w-32 h-32 rounded-[32px] bg-slate-800 border-2 border-slate-800"
-                />
+            <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
+              <View style={styles.profileHeader}>
+                <Image source={{ uri: selectedDev?.image }} style={styles.largeAvatar} />
                 
-                <View className="ml-6 flex-1">
-                  <View className="bg-[#FF6B00] self-start px-2 py-0.5 rounded-md mb-2">
-                    <Text className="text-white text-[10px] font-black uppercase italic">
-                      {selectedDev?.role}
-                    </Text>
+                <View style={styles.profileMeta}>
+                  <View style={[styles.roleBadge, { marginBottom: 8 }]}>
+                    <Text style={styles.roleText}>{selectedDev?.role.toUpperCase()}</Text>
                   </View>
-                  <Text className="text-white text-3xl font-black italic uppercase tracking-tighter mb-4">
-                    {selectedDev?.name}
-                  </Text>
+                  <Text style={styles.largeName}>{selectedDev?.name.toUpperCase()}</Text>
                   
-                  <View className="flex-row gap-x-6">
+                  <View style={styles.socialRowLarge}>
                     <TouchableOpacity onPress={() => openLink(selectedDev?.socials.instagram || '')}>
-                      <Ionicons name="logo-instagram" size={22} color="#FF6B00" />
+                      <Ionicons name="logo-instagram" size={22} color={THEME.colors.accent} />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => openLink(selectedDev?.socials.linkedin || '')}>
-                      <Ionicons name="logo-linkedin" size={22} color="#FF6B00" />
+                      <Ionicons name="logo-linkedin" size={22} color={THEME.colors.accent} />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => openLink(selectedDev?.socials.github || '')}>
-                      <Ionicons name="logo-github" size={22} color="#FF6B00" />
+                      <Ionicons name="logo-github" size={22} color={THEME.colors.accent} />
                     </TouchableOpacity>
                   </View>
                 </View>
               </View>
 
-              {/* Quote Section (Cursive) */}
-              <View className="mb-8 px-4">
-                <Text 
-                  style={{ 
-                    fontFamily: Platform.OS === 'ios' ? 'Snell Roundhand' : 'serif',
-                    fontSize: 22 
-                  }}
-                  className="text-blue-400 text-center italic"
-                >
-                  "{selectedDev?.quote}"
-                </Text>
+              <View style={styles.quoteBox}>
+                <Text style={styles.quoteText}>&quot;{selectedDev?.quote}&quot;</Text>
               </View>
 
-              {/* Separator Line */}
-              <View className="h-[1px] bg-slate-900 w-full mb-10" />
+              <View style={styles.modalDivider} />
 
-              {/* About Section */}
-              <View className="mb-12">
-                <Text className="text-slate-500 font-black uppercase text-[12px] tracking-[4px] mb-4">
-                  Biography // Profile
-                </Text>
-                <Text className="text-slate-300 text-base leading-7 text-justify">
-                  {selectedDev?.about}
-                </Text>
+              <View style={styles.bioSection}>
+                <Text style={styles.bioLabel}>BIOGRAPHY // PROFILE</Text>
+                <Text style={styles.bioText}>{selectedDev?.about}</Text>
               </View>
 
-              {/* Decorative Footer */}
-              <View className="items-center mb-16 opacity-30">
-                  <Text className="text-slate-500 text-[8px] font-mono uppercase tracking-[6px]">
-                      VERGE 2026
-                  </Text>
+              <View style={styles.modalFooter}>
+                <Text style={styles.footerBrand}>VERGE 2026</Text>
               </View>
             </ScrollView>
           </View>
@@ -219,3 +171,36 @@ export default function Developers() {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: THEME.colors.bg },
+  content: { flex: 1, paddingHorizontal: 20, paddingTop: 24 },
+  devCard: {
+    flexDirection: 'row', backgroundColor: THEME.colors.cardBg, borderWidth: 1,
+    borderColor: THEME.colors.border, borderRadius: 24, paddingHorizontal: 20, padding: 20, marginBottom: 16,
+  },
+  devThumb: { width: 80, height: 80, borderRadius: 16, backgroundColor: THEME.colors.surface },
+  devInfo: { marginLeft: 16, flex: 1, justifyContent: 'center' },
+  roleBadge: { backgroundColor: THEME.colors.accent, alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6, marginBottom: 6 },
+  roleText: { color: '#000', fontSize: 9, fontWeight: '900', letterSpacing: 1 },
+  devName: { color: THEME.colors.text, fontSize: 18, fontWeight: '900', letterSpacing: 0.5, marginBottom: 12 },
+  socialRow: { flexDirection: 'row', gap: 20 },
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.9)' },
+  modalContent: { backgroundColor: THEME.colors.bg, height: '90%', borderRadius: 40, borderTopWidth: 1, borderTopColor: 'rgba(255,107,0,0.2)', overflow: 'hidden' },
+  modalHeader: { alignItems: 'center', marginTop: 20, marginBottom: 10 },
+  closeBtn: { width: 56, height: 56, borderRadius: 20, backgroundColor: THEME.colors.cardBg, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: THEME.colors.border },
+  modalScroll: { flex: 1, paddingHorizontal: 32, paddingTop: 20 },
+  profileHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 40 },
+  largeAvatar: { width: 120, height: 120, borderRadius: 32, backgroundColor: THEME.colors.surface, borderWidth: 2, borderColor: THEME.colors.border },
+  profileMeta: { marginLeft: 24, flex: 1 },
+  largeName: { color: THEME.colors.text, fontSize: 28, fontWeight: '900', letterSpacing: -0.5, marginBottom: 16 },
+  socialRowLarge: { flexDirection: 'row', gap: 24 },
+  quoteBox: { paddingHorizontal: 16, marginBottom: 32 },
+  quoteText: { color: THEME.colors.accent, textAlign: 'center', fontSize: 20, fontStyle: 'italic', opacity: 0.8 },
+  modalDivider: { height: 1, backgroundColor: THEME.colors.border, width: '100%', marginBottom: 32 },
+  bioSection: { marginBottom: 48 },
+  bioLabel: { color: THEME.colors.textMuted, fontSize: 10, fontWeight: '900', letterSpacing: 4, marginBottom: 16 },
+  bioText: { color: THEME.colors.textSecondary, fontSize: 15, lineHeight: 26, textAlign: 'justify' },
+  modalFooter: { alignItems: 'center', marginBottom: 40, opacity: 0.2 },
+  footerBrand: { color: THEME.colors.textMuted, fontSize: 8, fontWeight: '700', letterSpacing: 6 }
+});
